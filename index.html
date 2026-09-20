@@ -283,7 +283,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 
   <!-- ===== 設定 ===== -->
   <section class="view" id="v-set">
-    <header class="top"><h1>設定</h1><span class="sub">v0.2</span></header>
+    <header class="top"><h1>設定</h1><span class="sub">v0.3</span></header>
     <div id="set-body"></div>
   </section>
 
@@ -386,6 +386,34 @@ async function dbPut(store,val){const t=db.transaction(store,'readwrite');t.obje
 async function dbDel(store,id){const t=db.transaction(store,'readwrite');t.objectStore(store).delete(id);await txDone(t)}
 function dbAll(store){return new Promise((res,rej)=>{const r=db.transaction(store,'readonly').objectStore(store).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})}
 function dbGet(store,id){return new Promise((res,rej)=>{const r=db.transaction(store,'readonly').objectStore(store).get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)})}
+function dbKeys(store){return new Promise((res,rej)=>{const r=db.transaction(store,'readonly').objectStore(store).getAllKeys();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})}
+
+/* v0.3より前は写真IDを服に書き忘れていた。IDに含まれる時刻で突き合わせて復旧する */
+async function repairPhotoLinks(){
+  const orphans=S.items.filter(i=>!i.photoId);
+  if(!orphans.length) return 0;
+  const used=new Set(S.items.map(i=>i.photoId).filter(Boolean));
+  const free=(await dbKeys('photos'))
+    .filter(k=>!used.has(k))
+    .map(k=>({id:k,t:parseInt(String(k).slice(0,8),36)}))
+    .filter(p=>Number.isFinite(p.t));
+  if(!free.length) return 0;
+  let fixed=0;
+  for(const it of orphans){
+    const t=parseInt(String(it.id).slice(0,8),36);
+    if(!Number.isFinite(t)) continue;
+    let best=null,bd=Infinity;
+    for(const p of free){ const gap=Math.abs(p.t-t); if(gap<bd){bd=gap;best=p} }
+    if(best&&bd<=2000){
+      it.photoId=best.id;
+      await dbPut('items',it);
+      free.splice(free.indexOf(best),1);
+      fixed++;
+    }
+  }
+  if(fixed) await reload();
+  return fixed;
+}
 
 /* ============================================================
    状態
@@ -1071,7 +1099,7 @@ function renderSet(){
   </div>`;
 
   h+=`<h2 class="sec">このアプリについて</h2><div class="card tiny muted">
-    家族ローゼット（かぞクロ）v0.2<br>
+    家族ローゼット（かぞクロ）v0.3<br>
     子どものサイズアウトを、手遅れになる前に教えるアプリです。<br><br>
     身長の記録が2回以上あると、その子の実際の成長ペースで予測します。<br>
     コーデ提案は、服のデータが貯まってから追加する予定です。
@@ -1273,7 +1301,7 @@ async function saveDraft(keepGoing){
   if(d.blob){ photoId=uid(); await dbPut('photos',{id:photoId,blob:d.blob}) }
 
   const it={
-    id:uid(), memberId:mid, category:d.category,
+    id:uid(), memberId:mid, category:d.category, photoId,
     size:String(d.size??memberOf(mid)?.currentSize??''),
     color:d.color||null, brand:(d.brand||'').trim()||null,
     price:d.price?Number(d.price):null,
@@ -1552,7 +1580,9 @@ document.addEventListener('change',async e=>{
   try{
     await openDB();
     await reload();
+    const fixed=await repairPhotoLinks();
     go('today');
+    if(fixed) setTimeout(()=>toast(fixed+'着の写真を復旧しました'),600);
   }catch(e){
     document.getElementById('app').innerHTML=
       '<div class="empty"><span class="g">⚠️</span><p>データベースを開けませんでした。<br>プライベートブラウズを解除して、もう一度開いてください。</p></div>';
