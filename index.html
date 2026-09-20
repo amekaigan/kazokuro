@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#E8ECEE">
+<title>家族のクローゼット</title>
+<style>
+:root{
+  --bg:#E8ECEE; --surface:#FFFFFF; --surface2:#F3F6F7;
+  --ink:#16323B; --ink2:#5C7480; --ink3:#8CA0A8;
+  --line:#D5DDE0; --line2:#E6ECEE;
+  --indigo:#24557A; --indigo-d:#1A4160; --indigo-bg:#E4EDF4;
+  --amber:#A96E12; --amber-bg:#FAF0DC;
+  --ok:#35705A; --ok-bg:#E4F0EA;
+  --danger:#9B3B33;
+  --r:14px; --r-s:9px;
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --nav-h:58px;
+  box-sizing:border-box;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#101A1E; --surface:#182529; --surface2:#1F2E33;
+    --ink:#E4EDEF; --ink2:#9AB0B8; --ink3:#6E858D;
+    --line:#2A3B41; --line2:#223237;
+    --indigo:#7FB0D6; --indigo-d:#A3C8E5; --indigo-bg:#1C3243;
+    --amber:#D9A74E; --amber-bg:#33291A;
+    --ok:#6FB294; --ok-bg:#1B2F28;
+    --danger:#D97A70;
+  }
+}
+*,*::before,*::after{box-sizing:inherit}
+html{-webkit-text-size-adjust:100%}
+html,body{margin:0;height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  font-size:15px; line-height:1.6; letter-spacing:.01em;
+  padding-top:var(--safe-t);
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none;padding:0}
+:focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- shell ---------- */
+#app{max-width:620px;margin:0 auto;padding:0 16px calc(var(--nav-h) + var(--safe-b) + 28px)}
+.view{display:none}
+.view.on{display:block}
+
+header.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:20px 0 14px}
+header.top h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.02em}
+header.top .sub{font-size:12.5px;color:var(--ink2);font-variant-numeric:tabular-nums}
+
+/* ---------- bottom nav ---------- */
+nav.tabs{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;
+  display:flex;background:var(--surface);
+  border-top:1px solid var(--line);
+  padding-bottom:var(--safe-b);
+}
+nav.tabs button{
+  flex:1;height:var(--nav-h);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px;
+  color:var(--ink3);font-size:10.5px;font-weight:500;
+}
+nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button[aria-current="page"]{color:var(--indigo)}
+nav.tabs button .dot{position:absolute;margin-top:-26px;margin-left:16px;min-width:16px;height:16px;border-radius:8px;background:var(--amber);color:#fff;font-size:10px;line-height:16px;font-weight:700;padding:0 4px}
+@media (prefers-color-scheme:dark){nav.tabs button .dot{color:#241C0B}}
+
+/* ---------- cards & bits ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card + .card{margin-top:12px}
+.muted{color:var(--ink2)}
+.tiny{font-size:12.5px}
+.num{font-variant-numeric:tabular-nums}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:11px 18px;border-radius:10px;font-size:15px;font-weight:600;
+  background:var(--indigo);color:#fff;transition:opacity .12s}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn{color:#0E1A20}}
+.btn:active{opacity:.75}
+.btn.ghost{background:transparent;color:var(--indigo);border:1px solid var(--line)}
+.btn.sub{background:var(--surface2);color:var(--ink);border:1px solid var(--line)}
+.btn.wide{width:100%}
+.btn.sm{padding:8px 13px;font-size:13.5px;border-radius:8px}
+.btn[disabled]{opacity:.4;pointer-events:none}
+
+label.f{display:block;margin:14px 0 5px;font-size:12.5px;font-weight:600;color:var(--ink2)}
+input[type=text],input[type=number],input[type=date],select,textarea{
+  width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;
+  background:var(--surface2);font-size:16px}
+textarea{resize:vertical;line-height:1.7}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{padding:7px 13px;border-radius:999px;border:1px solid var(--line);
+  background:var(--surface2);font-size:13.5px;font-weight:500;color:var(--ink2)}
+.chip[aria-pressed="true"]{background:var(--indigo);border-color:var(--indigo);color:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chip[aria-pressed="true"]{color:#0E1A20}}
+.chip .sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;
+  vertical-align:-1px;border:1px solid rgba(0,0,0,.18)}
+
+.catgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.catgrid button{padding:11px 4px;border-radius:10px;border:1px solid var(--line);
+  background:var(--surface2);font-size:12px;font-weight:600;color:var(--ink2);text-align:center;line-height:1.35}
+.catgrid button .g{display:block;font-size:20px;margin-bottom:2px}
+.catgrid button[aria-pressed="true"]{background:var(--indigo-bg);border-color:var(--indigo);color:var(--indigo-d)}
+
+/* ---------- closet grid ---------- */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}
+@media(min-width:480px){.grid{grid-template-columns:repeat(4,1fr)}}
+.tile{position:relative;aspect-ratio:1;border-radius:var(--r-s);overflow:hidden;
+  background:var(--surface2);border:1px solid var(--line);display:block}
+.tile img{width:100%;height:100%;object-fit:cover;display:block;transition:filter .3s}
+.tile .ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px;opacity:.35}
+.tile .tag{position:absolute;left:5px;bottom:5px;padding:2px 6px;border-radius:5px;
+  background:rgba(10,22,27,.72);color:#fff;font-size:10.5px;font-weight:600;letter-spacing:.02em}
+.tile .flag{position:absolute;right:5px;top:5px;width:9px;height:9px;border-radius:5px;box-shadow:0 0 0 2px var(--surface)}
+.tile .flag.amber{background:var(--amber)}
+.tile .flag.ok{background:var(--ok)}
+
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink3);margin-top:10px;align-items:center}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:4px;margin-right:5px;vertical-align:0}
+
+.filters{display:flex;gap:7px;overflow-x:auto;padding:2px 0 8px;-webkit-overflow-scrolling:touch}
+.filters::-webkit-scrollbar{display:none}
+.filters .chip{flex:0 0 auto}
+
+.empty{text-align:center;padding:44px 20px;color:var(--ink2)}
+.empty .g{font-size:38px;display:block;margin-bottom:10px;opacity:.55}
+.empty p{margin:0 0 16px;font-size:14px}
+
+/* ---------- stats ---------- */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line2);
+  border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.stats div{background:var(--surface);padding:14px 8px;text-align:center}
+.stats b{display:block;font-size:21px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.stats span{font-size:11px;color:var(--ink2)}
+
+/* ---------- list rows ---------- */
+.row{display:flex;gap:12px;align-items:center;padding:11px 0;border-top:1px solid var(--line2)}
+.row:first-of-type{border-top:none}
+.row .th{width:52px;height:52px;flex:0 0 52px;border-radius:8px;overflow:hidden;background:var(--surface2);
+  display:flex;align-items:center;justify-content:center;font-size:20px;border:1px solid var(--line)}
+.row .th img{width:100%;height:100%;object-fit:cover}
+.row .body{flex:1;min-width:0}
+.row .body b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .body span{font-size:12px;color:var(--ink2)}
+
+.note{border-radius:var(--r-s);padding:11px 13px;font-size:13px;line-height:1.65}
+.note.amber{background:var(--amber-bg);color:var(--amber)}
+.note.ok{background:var(--ok-bg);color:var(--ok)}
+.note.indigo{background:var(--indigo-bg);color:var(--indigo-d)}
+
+h2.sec{margin:26px 0 10px;font-size:15px;font-weight:700}
+h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-variant-numeric:tabular-nums}
+
+/* ---------- sheet ---------- */
+.scrim{position:fixed;inset:0;background:rgba(8,18,22,.5);z-index:50;display:none}
+.scrim.on{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;background:var(--bg);
+  border-radius:18px 18px 0 0;max-height:92vh;overflow-y:auto;display:none;
+  padding:0 16px calc(var(--safe-b) + 24px);-webkit-overflow-scrolling:touch}
+.sheet.on{display:block}
+.sheet .handle{width:38px;height:4px;border-radius:2px;background:var(--line);margin:9px auto 4px}
+.sheet .shead{display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;background:var(--bg);padding:8px 0 12px;z-index:2}
+.sheet .shead h3{margin:0;font-size:17px;font-weight:700}
+.sheet .x{font-size:15px;color:var(--ink2);padding:6px 4px;font-weight:600}
+.sheet .inner{max-width:588px;margin:0 auto}
+
+.hero{width:100%;aspect-ratio:1;object-fit:cover;border-radius:var(--r);border:1px solid var(--line);background:var(--surface2);display:block}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;font-size:13.5px;margin:14px 0}
+.kv dt{color:var(--ink2)}
+.kv dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
+
+.shot{width:100%;aspect-ratio:1;border-radius:var(--r);border:2px dashed var(--line);
+  background:var(--surface2);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:9px;color:var(--ink2);font-size:14px;font-weight:600}
+.shot .g{font-size:40px}
+.shot img{width:100%;height:100%;object-fit:cover;border-radius:12px}
+.shot.has{border-style:solid;padding:0;overflow:hidden}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + var(--safe-b) + 16px);
+  background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:13.5px;
+  font-weight:600;z-index:80;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+.sp{height:8px}
+.hr{height:1px;background:var(--line);margin:18px 0}
+.act{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.act .btn{flex:1;min-width:120px}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ===== 今日 ===== -->
+  <section class="view on" id="v-today">
+    <header class="top"><h1>今日</h1><span class="sub" id="today-date"></span></header>
+    <div class="stats" id="today-stats"></div>
+    <div class="sp"></div>
+    <div id="today-body"></div>
+  </section>
+
+  <!-- ===== クローゼット ===== -->
+  <section class="view" id="v-closet">
+    <header class="top"><h1>クローゼット</h1><span class="sub" id="closet-count"></span></header>
+    <div class="filters" id="f-member"></div>
+    <div class="filters" id="f-cat"></div>
+    <div id="closet-body"></div>
+  </section>
+
+  <!-- ===== 登録 ===== -->
+  <section class="view" id="v-add">
+    <header class="top"><h1>登録</h1><span class="sub" id="add-streak"></span></header>
+    <div id="add-body"></div>
+  </section>
+
+  <!-- ===== 手放す ===== -->
+  <section class="view" id="v-out">
+    <header class="top"><h1>手放す</h1><span class="sub" id="out-count"></span></header>
+    <div id="out-body"></div>
+  </section>
+
+  <!-- ===== 設定 ===== -->
+  <section class="view" id="v-set">
+    <header class="top"><h1>設定</h1><span class="sub">v0.1</span></header>
+    <div id="set-body"></div>
+  </section>
+
+</div>
+
+<nav class="tabs" id="tabs"></nav>
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"><div class="handle"></div><div class="inner" id="sheet-inner"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   定数
+   ============================================================ */
+const CATS = [
+  {id:'tops',   n:'トップス', g:'👕'},
+  {id:'bottoms',n:'ボトムス', g:'👖'},
+  {id:'outer',  n:'アウター', g:'🧥'},
+  {id:'dress',  n:'ワンピ',   g:'👗'},
+  {id:'shoes',  n:'くつ',     g:'👟'},
+  {id:'under',  n:'インナー', g:'🩲'},
+  {id:'goods',  n:'こもの',   g:'🧣'},
+  {id:'other',  n:'その他',   g:'🧺'}
+];
+const COLORS = [
+  {n:'ホワイト', hex:'#FFFFFF'}, {n:'ブラック', hex:'#1A1A1A'},
+  {n:'グレー',   hex:'#8A9295'}, {n:'ネイビー', hex:'#22324F'},
+  {n:'ブルー',   hex:'#3C6FB0'}, {n:'サックス', hex:'#9EC4DE'},
+  {n:'グリーン', hex:'#3F7A4F'}, {n:'カーキ', hex:'#7A7550'},
+  {n:'イエロー', hex:'#E0B93C'}, {n:'オレンジ', hex:'#D97B37'},
+  {n:'レッド',   hex:'#B93A38'}, {n:'ピンク',   hex:'#DFA0AE'},
+  {n:'パープル', hex:'#7A5C96'}, {n:'ブラウン', hex:'#7A5340'},
+  {n:'ベージュ', hex:'#D6C3A5'}, {n:'柄物',     hex:'#B9AFA2'}
+];
+const SEASONS = ['春','夏','秋','冬'];
+const KID_SIZES = [80,90,100,110,120,130,140,150,160];
+const ADULT_SIZES = ['XS','S','M','L','XL','XXL','F'];
+const STALE_DAYS = 120;      // これ以上着ていなければ「眠っている服」
+const MERCARI_MIN = 300;
+
+/* ============================================================
+   IndexedDB
+   ============================================================ */
+const DB_NAME='kazoku-closet', DB_VER=1;
+let db=null;
+
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(DB_NAME,DB_VER);
+    r.onupgradeneeded=e=>{
+      const d=e.target.result;
+      if(!d.objectStoreNames.contains('members')) d.createObjectStore('members',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('items')){
+        const s=d.createObjectStore('items',{keyPath:'id'});
+        s.createIndex('memberId','memberId',{unique:false});
+      }
+      if(!d.objectStoreNames.contains('wears')){
+        const s=d.createObjectStore('wears',{keyPath:'id'});
+        s.createIndex('itemId','itemId',{unique:false});
+      }
+      if(!d.objectStoreNames.contains('photos')) d.createObjectStore('photos',{keyPath:'id'});
+    };
+    r.onsuccess=()=>{db=r.result;res(db)};
+    r.onerror=()=>rej(r.error);
+  });
+}
+function txDone(t){return new Promise((res,rej)=>{t.oncomplete=()=>res();t.onabort=t.onerror=()=>rej(t.error)})}
+async function dbPut(store,val){const t=db.transaction(store,'readwrite');t.objectStore(store).put(val);await txDone(t);return val}
+async function dbDel(store,id){const t=db.transaction(store,'readwrite');t.objectStore(store).delete(id);await txDone(t)}
+function dbAll(store){return new Promise((res,rej)=>{const r=db.transaction(store,'readonly').objectStore(store).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})}
+function dbGet(store,id){return new Promise((res,rej)=>{const r=db.transaction(store,'readonly').objectStore(store).get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)})}
+
+/* ============================================================
+   状態
+   ============================================================ */
+const S = {
+  members:[], items:[], wears:[],
+  view:'today',
+  fMember:'all', fCat:'all',
+  draft:null,          // 登録中の1着
+  lastUsed:{memberId:null,category:null}
+};
+const urlCache=new Map();
+
+async function photoURL(id){
+  if(!id) return null;
+  if(urlCache.has(id)) return urlCache.get(id);
+  const p=await dbGet('photos',id);
+  if(!p) return null;
+  const u=URL.createObjectURL(p.blob);
+  urlCache.set(id,u);
+  return u;
+}
+async function reload(){
+  const [m,i,w]=await Promise.all([dbAll('members'),dbAll('items'),dbAll('wears')]);
+  S.members=m.sort((a,b)=>(a.order??0)-(b.order??0));
+  S.items=i;
+  S.wears=w;
+}
+
+/* ============================================================
+   小物ユーティリティ
+   ============================================================ */
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today=()=>new Date().toISOString().slice(0,10);
+function daysSince(d){ if(!d) return null; return Math.floor((Date.now()-new Date(d+'T00:00:00').getTime())/86400000) }
+function yen(n){ return n==null||n===''?'—':'¥'+Number(n).toLocaleString('ja-JP') }
+function catOf(id){ return CATS.find(c=>c.id===id)||CATS[7] }
+function memberOf(id){ return S.members.find(m=>m.id===id)||null }
+function ageOf(m){
+  if(!m||!m.birthday) return null;
+  const b=new Date(m.birthday+'T00:00:00'), n=new Date();
+  let a=n.getFullYear()-b.getFullYear();
+  const md=n.getMonth()-b.getMonth();
+  if(md<0||(md===0&&n.getDate()<b.getDate())) a--;
+  return a;
+}
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('on');
+  clearTimeout(toast._h); toast._h=setTimeout(()=>t.classList.remove('on'),1900);
+}
+function sizeNum(s){ const n=parseInt(s,10); return Number.isFinite(n)&&n>=60&&n<=200?n:null }
+
+/* 眠り具合 → CSSフィルタ。着ていない服ほど色が抜ける */
+function fadeStyle(item){
+  const d=daysSince(item.lastWorn||item.addedAt);
+  if(d===null||d<14) return '';
+  const t=Math.min(1,(d-14)/(STALE_DAYS-14));
+  const sat=(1-t*0.88).toFixed(2), op=(1-t*0.38).toFixed(2);
+  return `filter:saturate(${sat});opacity:${op}`;
+}
+
+/* ============================================================
+   画像処理：リサイズ + 代表色の推定
+   ============================================================ */
+async function loadBitmap(file){
+  if(window.createImageBitmap){
+    try{ return await createImageBitmap(file) }catch(e){}
+  }
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onload=()=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=fr.result};
+    fr.onerror=rej; fr.readAsDataURL(file);
+  });
+}
+async function processPhoto(file,max=900,q=0.72){
+  const src=await loadBitmap(file);
+  const sw=src.width||src.naturalWidth, sh=src.height||src.naturalHeight;
+  const sc=Math.min(1,max/Math.max(sw,sh));
+  const w=Math.round(sw*sc), h=Math.round(sh*sc);
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  const cx=cv.getContext('2d'); cx.drawImage(src,0,0,w,h);
+  const color=guessColor(cx,w,h);
+  const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',q));
+  if(src.close) src.close();
+  return {blob,color,w,h};
+}
+function guessColor(cx,w,h){
+  try{
+    const x0=Math.round(w*0.2), y0=Math.round(h*0.2);
+    const cw=Math.max(1,Math.round(w*0.6)), ch=Math.max(1,Math.round(h*0.6));
+    const d=cx.getImageData(x0,y0,cw,ch).data;
+    const buckets=new Map();
+    for(let i=0;i<d.length;i+=16){          // 4pxおき
+      const r=d[i],g=d[i+1],b=d[i+2];
+      const k=(r>>4)*256+(g>>4)*16+(b>>4);
+      const e=buckets.get(k)||[0,0,0,0];
+      e[0]+=r;e[1]+=g;e[2]+=b;e[3]++; buckets.set(k,e);
+    }
+    let best=null,bc=0;
+    for(const e of buckets.values()){ if(e[3]>bc){bc=e[3];best=e} }
+    if(!best) return null;
+    const r=best[0]/best[3], g=best[1]/best[3], b=best[2]/best[3];
+    let nearest=null,nd=1e9;
+    for(const c of COLORS){
+      if(c.n==='柄物') continue;
+      const cr=parseInt(c.hex.slice(1,3),16), cg=parseInt(c.hex.slice(3,5),16), cb=parseInt(c.hex.slice(5,7),16);
+      const dist=(r-cr)**2*0.3+(g-cg)**2*0.59+(b-cb)**2*0.11;
+      if(dist<nd){nd=dist;nearest=c.n}
+    }
+    return nearest;
+  }catch(e){ return null }
+}
+
+/* ============================================================
+   判定ロジック
+   ============================================================ */
+function isActive(it){ return (it.status||'active')==='active' }
+
+/* サイズアウト：本人の現在サイズより小さい数値サイズの服 */
+function isOutgrown(it){
+  if(!isActive(it)) return false;
+  const m=memberOf(it.memberId); if(!m) return false;
+  const cur=sizeNum(m.currentSize), s=sizeNum(it.size);
+  return cur!==null && s!==null && s < cur;
+}
+/* 眠っている服 */
+function isStale(it){
+  if(!isActive(it)) return false;
+  if(isOutgrown(it)) return false;
+  const d=daysSince(it.lastWorn||it.addedAt);
+  return d!==null && d>=STALE_DAYS;
+}
+/* おさがり：サイズアウト品を、今それが合う別メンバーへ */
+function handDownTarget(it){
+  const s=sizeNum(it.size); if(s===null) return null;
+  const owner=memberOf(it.memberId);
+  for(const m of S.members){
+    if(m.id===it.memberId) continue;
+    const cur=sizeNum(m.currentSize);
+    if(cur===null) continue;
+    if(s>=cur && s<=cur+10) return m;     // 今ぴったり〜1サイズ上まで
+  }
+  return owner?null:null;
+}
+/* 次のサイズアウト予測（子ども：1年で約1サイズ=10cm と仮定） */
+function outgrowForecast(m){
+  const cur=sizeNum(m.currentSize); const age=ageOf(m);
+  if(cur===null||age===null||age>14) return null;
+  const n=S.items.filter(i=>i.memberId===m.id&&isActive(i)&&sizeNum(i.size)===cur).length;
+  if(!n) return null;
+  return {size:cur,count:n,months:12};
+}
+/* メルカリ想定価格（目安） */
+function estPrice(it){
+  const p=Number(it.price);
+  if(!Number.isFinite(p)||p<=0) return null;
+  const y=it.purchaseDate?Math.max(0,daysSince(it.purchaseDate)/365):1;
+  const yf=Math.max(0.28,1-y*0.22);
+  const wf=Math.max(0.55,1-(it.wearCount||0)*0.018);
+  const v=Math.round(p*0.42*yf*wf/100)*100;
+  return Math.max(MERCARI_MIN,v);
+}
+function listingText(it){
+  const m=memberOf(it.memberId), c=catOf(it.category);
+  const brand=it.brand?it.brand:'';
+  const kid=(ageOf(m)??99)<=14;
+  const title=[brand,kid?'キッズ':'',c.n,it.size||'',it.color||''].filter(Boolean).join(' ');
+  const L=[];
+  L.push(title);
+  L.push('');
+  L.push('ご覧いただきありがとうございます。');
+  L.push('');
+  L.push('■カテゴリ：'+c.n);
+  if(it.size)  L.push('■サイズ：'+it.size);
+  if(it.color) L.push('■カラー：'+it.color);
+  if(brand)    L.push('■ブランド：'+brand);
+  if(it.season&&it.season.length) L.push('■シーズン：'+it.season.join('・'));
+  L.push('■着用回数：'+(it.wearCount||0)+'回');
+  L.push('■状態：目立った傷や汚れなし');
+  L.push('');
+  L.push(isOutgrown(it)
+    ? '子どもの成長に伴いサイズアウトしたため出品します。'
+    : 'あまり着る機会がなくなったため出品します。');
+  L.push('自宅保管品のため、神経質な方はご購入をお控えください。');
+  L.push('');
+  L.push('#'+c.n+' '+(it.size?'#'+it.size:'')+(brand?' #'+brand:''));
+  return L.join('\n');
+}
+
+/* ============================================================
+   ルーティング
+   ============================================================ */
+const TABS=[
+  {id:'today', n:'今日',       d:'M12 3v2M12 19v2M3 12h2M19 12h2M12 7a5 5 0 100 10 5 5 0 000-10z'},
+  {id:'closet',n:'クローゼット',d:'M4 4h16v16H4zM12 4v16M8 11h1M15 11h1'},
+  {id:'add',   n:'登録',       d:'M12 5v14M5 12h14'},
+  {id:'out',   n:'手放す',     d:'M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13'},
+  {id:'set',   n:'設定',       d:'M12 9a3 3 0 100 6 3 3 0 000-6zM4 12h2M18 12h2M12 4v2M12 18v2'}
+];
+function renderTabs(){
+  const outN=S.items.filter(i=>isOutgrown(i)||isStale(i)).length;
+  $('#tabs').innerHTML=TABS.map(t=>`
+    <button data-tab="${t.id}" ${S.view===t.id?'aria-current="page"':''}>
+      <svg viewBox="0 0 24 24"><path d="${t.d}"/></svg>
+      ${t.id==='out'&&outN?`<span class="dot">${outN>99?'99+':outN}</span>`:''}
+      <span>${t.n}</span>
+    </button>`).join('');
+}
+function go(v){
+  S.view=v;
+  document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));
+  window.scrollTo(0,0);
+  renderTabs(); render();
+}
+
+/* ============================================================
+   描画
+   ============================================================ */
+function render(){
+  renderTabs();
+  if(S.view==='today')  renderToday();
+  if(S.view==='closet') renderCloset();
+  if(S.view==='add')    renderAdd();
+  if(S.view==='out')    renderOut();
+  if(S.view==='set')    renderSet();
+}
+
+/* ---------- 今日 ---------- */
+function renderToday(){
+  const d=new Date();
+  $('#today-date').textContent=`${d.getMonth()+1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）`;
+
+  const act=S.items.filter(isActive);
+  const total=act.reduce((s,i)=>s+(Number(i.price)||0),0);
+  const wornToday=S.wears.filter(w=>w.date===today()).length;
+  $('#today-stats').innerHTML=`
+    <div><b class="num">${act.length}</b><span>登録した服</span></div>
+    <div><b class="num">${wornToday}</b><span>今日着た服</span></div>
+    <div><b class="num">${total?'¥'+Math.round(total/10000)+'万':'—'}</b><span>クローゼット総額</span></div>`;
+
+  if(!S.members.length){
+    $('#today-body').innerHTML=`
+      <div class="empty">
+        <span class="g">👨‍👩‍👧‍👦</span>
+        <p>まず家族を登録します。<br>誰の服なのかを分けるところからです。</p>
+        <button class="btn" data-go="set">家族を登録する</button>
+      </div>`;
+    return;
+  }
+  if(!act.length){
+    $('#today-body').innerHTML=`
+      <div class="empty">
+        <span class="g">📷</span>
+        <p>服がまだ1着もありません。<br>まずは今日着た服を撮ってみてください。</p>
+        <button class="btn" data-go="add">服を登録する</button>
+      </div>`;
+    return;
+  }
+
+  let h='';
+
+  // 今日着たものを記録するショートカット
+  h+=`<h2 class="sec">今日着た服を記録<span class="c">${wornToday}着</span></h2>`;
+  h+=`<div class="card tiny muted">タップするだけで着用回数と最終着用日が更新されます。ここが貯まると「着ていない服」が正確に出ます。</div>`;
+  h+=`<div class="filters" id="today-mem"></div><div class="grid" id="today-grid"></div>`;
+
+  // サイズアウト予測
+  const fc=S.members.map(m=>({m,f:outgrowForecast(m)})).filter(x=>x.f);
+  if(fc.length){
+    h+=`<h2 class="sec">そろそろサイズアウト</h2>`;
+    h+=fc.map(({m,f})=>`<div class="note amber" style="margin-bottom:8px">${esc(m.name)}さん（${ageOf(m)}歳）の ${f.size}cm の服が ${f.count}着。この1年で入れ替え時期がきます。</div>`).join('');
+  }
+  $('#today-body').innerHTML=h;
+
+  // メンバーフィルタ（今日の記録用）
+  if(!S._todayMem) S._todayMem=S.members[0].id;
+  $('#today-mem').innerHTML=S.members.map(m=>
+    `<button class="chip" data-tmem="${m.id}" aria-pressed="${S._todayMem===m.id}">${esc(m.name)}</button>`).join('');
+  drawTodayGrid();
+}
+async function drawTodayGrid(){
+  const g=$('#today-grid'); if(!g) return;
+  const list=S.items.filter(i=>isActive(i)&&i.memberId===S._todayMem)
+    .sort((a,b)=>(b.lastWorn||'').localeCompare(a.lastWorn||''))
+    .slice(0,24);
+  if(!list.length){ g.innerHTML=`<div class="tiny muted" style="grid-column:1/-1">この人の服はまだありません。</div>`; return }
+  g.innerHTML=list.map(it=>{
+    const worn=S.wears.some(w=>w.itemId===it.id&&w.date===today());
+    return `<button class="tile" data-wear="${it.id}">
+      <div class="ph" data-photo="${it.photoId||''}">${catOf(it.category).g}</div>
+      ${worn?'<span class="flag ok"></span>':''}
+      <span class="tag">${worn?'着た':esc(it.size||catOf(it.category).n)}</span>
+    </button>`}).join('');
+  hydratePhotos(g);
+}
+
+/* ---------- クローゼット ---------- */
+function renderCloset(){
+  const act=S.items.filter(isActive);
+  $('#closet-count').textContent=act.length+'着';
+
+  $('#f-member').innerHTML=
+    `<button class="chip" data-fm="all" aria-pressed="${S.fMember==='all'}">全員</button>`+
+    S.members.map(m=>`<button class="chip" data-fm="${m.id}" aria-pressed="${S.fMember===m.id}">${esc(m.name)}</button>`).join('');
+  $('#f-cat').innerHTML=
+    `<button class="chip" data-fc="all" aria-pressed="${S.fCat==='all'}">すべて</button>`+
+    CATS.map(c=>`<button class="chip" data-fc="${c.id}" aria-pressed="${S.fCat===c.id}">${c.g} ${c.n}</button>`).join('');
+
+  let list=act;
+  if(S.fMember!=='all') list=list.filter(i=>i.memberId===S.fMember);
+  if(S.fCat!=='all')    list=list.filter(i=>i.category===S.fCat);
+  list.sort((a,b)=>(b.addedAt||'').localeCompare(a.addedAt||''));
+
+  if(!list.length){
+    $('#closet-body').innerHTML=`<div class="empty"><span class="g">🧺</span><p>条件に合う服がありません。</p>
+      <button class="btn" data-go="add">服を登録する</button></div>`;
+    return;
+  }
+  $('#closet-body').innerHTML=
+    `<div class="grid" id="closet-grid">`+list.map(it=>{
+      const d=daysSince(it.lastWorn);
+      const flag=isOutgrown(it)?'<span class="flag amber"></span>':'';
+      return `<button class="tile" data-item="${it.id}">
+        <div class="ph" data-photo="${it.photoId||''}" style="${fadeStyle(it)}">${catOf(it.category).g}</div>
+        ${flag}<span class="tag">${d===null?'未着用':d===0?'今日':d+'日前'}</span>
+      </button>`}).join('')+`</div>
+    <div class="legend">
+      <span>色が薄い＝しばらく着ていない服</span>
+      <span><i style="background:var(--amber)"></i>サイズアウト</span>
+    </div>`;
+  hydratePhotos($('#closet-grid'));
+}
+
+async function hydratePhotos(root){
+  if(!root) return;
+  for(const el of root.querySelectorAll('[data-photo]')){
+    const pid=el.getAttribute('data-photo');
+    if(!pid) continue;
+    const u=await photoURL(pid);
+    if(u){ const st=el.getAttribute('style')||''; el.outerHTML=`<img src="${u}" alt="" style="${st}">` }
+  }
+}
+
+/* ---------- 登録 ---------- */
+function renderAdd(){
+  if(!S.members.length){
+    $('#add-body').innerHTML=`<div class="empty"><span class="g">👨‍👩‍👧‍👦</span>
+      <p>先に家族を登録してください。</p><button class="btn" data-go="set">家族を登録する</button></div>`;
+    return;
+  }
+  const d=S.draft;
+  const todayN=S.items.filter(i=>i.addedAt===today()).length;
+  $('#add-streak').textContent=todayN?`今日 ${todayN}着`:'';
+
+  const mid = d?.memberId ?? S.lastUsed.memberId ?? S.members[0].id;
+  const cat = d?.category ?? S.lastUsed.category ?? null;
+  const mem = memberOf(mid);
+  const kid = (ageOf(mem)??99)<=14;
+  const sizes = kid?KID_SIZES.map(String):ADULT_SIZES;
+
+  $('#add-body').innerHTML=`
+  <div class="card">
+    <label for="shot" class="shot ${d?.photoURL?'has':''}" id="shot-label">
+      ${d?.photoURL?`<img src="${d.photoURL}" alt="撮影した服">`:'<span class="g">📷</span><span>服を撮る / 写真を選ぶ</span>'}
+    </label>
+    <input type="file" id="shot" accept="image/*" hidden>
+
+    <label class="f">だれの服</label>
+    <div class="chips" id="d-mem">${S.members.map(m=>
+      `<button class="chip" data-dmem="${m.id}" aria-pressed="${mid===m.id}">${esc(m.name)}</button>`).join('')}</div>
+
+    <label class="f">カテゴリ</label>
+    <div class="catgrid" id="d-cat">${CATS.map(c=>
+      `<button data-dcat="${c.id}" aria-pressed="${cat===c.id}"><span class="g">${c.g}</span>${c.n}</button>`).join('')}</div>
+
+    <label class="f">サイズ</label>
+    <div class="chips" id="d-size">${sizes.map(s=>
+      `<button class="chip" data-dsize="${s}" aria-pressed="${(d?.size??mem?.currentSize)===s}">${s}</button>`).join('')}</div>
+
+    <label class="f">色${d?.autoColor?' <span style="font-weight:400">（写真から推定）</span>':''}</label>
+    <div class="chips" id="d-color">${COLORS.map(c=>
+      `<button class="chip" data-dcolor="${c.n}" aria-pressed="${d?.color===c.n}"><span class="sw" style="background:${c.hex}"></span>${c.n}</button>`).join('')}</div>
+
+    <label class="f">シーズン</label>
+    <div class="chips" id="d-season">${SEASONS.map(s=>
+      `<button class="chip" data-dseason="${s}" aria-pressed="${(d?.season||[]).includes(s)}">${s}</button>`).join('')}</div>
+
+    <label class="f" for="d-brand">ブランド（任意）</label>
+    <input type="text" id="d-brand" value="${esc(d?.brand||'')}" placeholder="ユニクロ / 無印 など">
+
+    <label class="f" for="d-price">買ったときの値段（任意）</label>
+    <input type="number" id="d-price" inputmode="numeric" value="${d?.price??''}" placeholder="1990">
+
+    <label class="f" for="d-pdate">購入日（任意）</label>
+    <input type="date" id="d-pdate" value="${d?.purchaseDate||''}">
+
+    <div class="act">
+      <button class="btn sub" id="save-next">保存して次を撮る</button>
+      <button class="btn" id="save-done">保存する</button>
+    </div>
+  </div>`;
+}
+
+/* ---------- 手放す ---------- */
+function renderOut(){
+  const outg=S.items.filter(isOutgrown);
+  const stale=S.items.filter(isStale);
+  const listed=S.items.filter(i=>i.status==='listed');
+  $('#out-count').textContent=(outg.length+stale.length)+'着';
+
+  if(!outg.length&&!stale.length&&!listed.length){
+    $('#out-body').innerHTML=`<div class="empty"><span class="g">✨</span>
+      <p>手放す候補はまだありません。<br>着用記録が貯まると、眠っている服がここに出ます。</p></div>`;
+    return;
+  }
+  let h='';
+  h+=`<div class="note indigo">メルカリへの自動出品はできないため、ここで出品文と価格の目安を作ってコピーし、メルカリアプリに貼り付けてください。</div>`;
+
+  if(outg.length){
+    h+=`<h2 class="sec">サイズアウト<span class="c">${outg.length}着</span></h2><div class="card" id="g-out">`+
+      outg.map(rowHTML).join('')+`</div>`;
+  }
+  if(stale.length){
+    h+=`<h2 class="sec">${STALE_DAYS}日以上着ていない<span class="c">${stale.length}着</span></h2><div class="card" id="g-stale">`+
+      stale.map(rowHTML).join('')+`</div>`;
+  }
+  if(listed.length){
+    h+=`<h2 class="sec">出品中<span class="c">${listed.length}着</span></h2><div class="card" id="g-listed">`+
+      listed.map(rowHTML).join('')+`</div>`;
+  }
+  $('#out-body').innerHTML=h;
+  ['#g-out','#g-stale','#g-listed'].forEach(s=>hydratePhotos($(s)));
+}
+function rowHTML(it){
+  const m=memberOf(it.memberId), c=catOf(it.category);
+  const hd=isOutgrown(it)?handDownTarget(it):null;
+  const est=estPrice(it);
+  const d=daysSince(it.lastWorn);
+  const sub = hd ? `${esc(hd.name)}さんにおさがりできます`
+    : (est?`出品目安 ${yen(est)}`:(d===null?'未着用':d+'日前に着用'));
+  return `<button class="row" data-item="${it.id}" style="width:100%;text-align:left">
+    <span class="th"><span data-photo="${it.photoId||''}">${c.g}</span></span>
+    <span class="body">
+      <b>${esc([it.brand,c.n,it.size,it.color].filter(Boolean).join(' '))}</b>
+      <span>${esc(m?m.name:'—')}・${sub}</span>
+    </span>
+  </button>`;
+}
+
+/* ---------- 設定 ---------- */
+function renderSet(){
+  let h=`<h2 class="sec">家族<span class="c">${S.members.length}人</span></h2><div class="card">`;
+  if(!S.members.length){
+    h+=`<p class="tiny muted" style="margin:0 0 12px">誰の服かを分けるため、まず家族を登録します。子どもは生年月日と今のサイズを入れると、サイズアウト判定が動きます。</p>`;
+  }else{
+    h+=S.members.map(m=>{
+      const a=ageOf(m), n=S.items.filter(i=>i.memberId===m.id&&isActive(i)).length;
+      return `<button class="row" data-member="${m.id}" style="width:100%;text-align:left">
+        <span class="th">${a!==null&&a<=14?'🧒':'🧑'}</span>
+        <span class="body"><b>${esc(m.name)}</b>
+        <span>${a!==null?a+'歳・':''}${m.currentSize?'現在 '+esc(m.currentSize)+'・':''}${n}着</span></span>
+      </button>`}).join('');
+  }
+  h+=`<div class="act"><button class="btn ghost wide" id="add-member">家族を追加する</button></div></div>`;
+
+  h+=`<h2 class="sec">バックアップ</h2><div class="card">
+    <p class="tiny muted" style="margin:0 0 12px">データはこの端末のブラウザ内だけに保存されています。ブラウザのデータを消すと失われます。定期的に書き出してください。</p>
+    <div class="act">
+      <button class="btn sub" id="exp-meta">データのみ書き出す</button>
+      <button class="btn sub" id="exp-full">写真ごと書き出す</button>
+    </div>
+    <div class="act"><button class="btn ghost wide" id="imp">読み込む</button></div>
+    <input type="file" id="impfile" accept="application/json,.json" hidden>
+  </div>`;
+
+  h+=`<h2 class="sec">このアプリについて</h2><div class="card tiny muted">
+    v0.1 — 家族の服をデータ化し、着用を記録し、サイズアウトと眠っている服を見つけるところまで。<br><br>
+    コーデ提案は、服のデータが貯まってから v0.2 で追加する予定です。
+  </div>`;
+  $('#set-body').innerHTML=h;
+}
+
+/* ============================================================
+   シート（詳細・編集）
+   ============================================================ */
+function openSheet(html){
+  $('#sheet-inner').innerHTML=html;
+  $('#sheet').classList.add('on'); $('#scrim').classList.add('on');
+  document.body.style.overflow='hidden';
+}
+function closeSheet(){
+  $('#sheet').classList.remove('on'); $('#scrim').classList.remove('on');
+  document.body.style.overflow='';
+}
+
+async function openItem(id){
+  const it=S.items.find(i=>i.id===id); if(!it) return;
+  const m=memberOf(it.memberId), c=catOf(it.category);
+  const u=await photoURL(it.photoId);
+  const d=daysSince(it.lastWorn);
+  const est=estPrice(it);
+  const cpw=(it.price&&it.wearCount)?Math.round(Number(it.price)/it.wearCount):null;
+  const hd=isOutgrown(it)?handDownTarget(it):null;
+
+  openSheet(`
+  <div class="shead"><h3>${esc([c.n,it.size].filter(Boolean).join(' '))}</h3><button class="x" data-close>閉じる</button></div>
+  ${u?`<img class="hero" src="${u}" alt="">`:`<div class="hero" style="display:flex;align-items:center;justify-content:center;font-size:52px">${c.g}</div>`}
+  <dl class="kv">
+    <dt>持ち主</dt><dd>${esc(m?m.name:'—')}</dd>
+    <dt>色</dt><dd>${esc(it.color||'—')}</dd>
+    <dt>ブランド</dt><dd>${esc(it.brand||'—')}</dd>
+    <dt>シーズン</dt><dd>${(it.season||[]).join('・')||'—'}</dd>
+    <dt>着用回数</dt><dd>${it.wearCount||0}回</dd>
+    <dt>最後に着た日</dt><dd>${d===null?'まだ着ていません':(d===0?'今日':d+'日前')}</dd>
+    <dt>購入価格</dt><dd>${yen(it.price)}</dd>
+    ${cpw!==null?`<dt>1回あたり</dt><dd>${yen(cpw)}</dd>`:''}
+  </dl>
+  ${hd?`<div class="note ok">${esc(hd.name)}さんの今のサイズに合います。おさがりに回せます。</div>`:''}
+  ${isOutgrown(it)&&!hd?`<div class="note amber">サイズアウトしています。${est?'出品の目安は '+yen(est)+' 前後です。':''}</div>`:''}
+  <div class="act">
+    <button class="btn" data-wear2="${it.id}">今日着た</button>
+    ${hd?`<button class="btn sub" data-handdown="${it.id}">${esc(hd.name)}さんへ</button>`:''}
+  </div>
+  <div class="act">
+    <button class="btn ghost" data-listing="${it.id}">出品文をつくる</button>
+    <button class="btn ghost" data-edit="${it.id}">編集</button>
+  </div>
+  <div class="hr"></div>
+  <div class="act">
+    ${it.status==='listed'
+      ? `<button class="btn sub" data-status="${it.id}|sold">売れた</button><button class="btn ghost" data-status="${it.id}|active">出品を取り消す</button>`
+      : `<button class="btn ghost" data-status="${it.id}|listed">出品中にする</button>`}
+    <button class="btn ghost" data-del="${it.id}" style="color:var(--danger)">削除</button>
+  </div>
+  <div class="sp"></div>`);
+}
+
+function openListing(id){
+  const it=S.items.find(i=>i.id===id); if(!it) return;
+  const est=estPrice(it);
+  openSheet(`
+  <div class="shead"><h3>出品文</h3><button class="x" data-close>閉じる</button></div>
+  ${est?`<div class="note indigo">価格の目安：<b>${yen(est)}</b>　購入価格・着用回数・経過年数からの概算です。実際の相場はメルカリで同等品を検索して確認してください。</div>`:
+        `<div class="note amber">購入価格が未入力のため、価格の目安は出せません。</div>`}
+  <label class="f" for="lt">コピーしてメルカリに貼り付けてください</label>
+  <textarea id="lt" rows="18">${esc(listingText(it))}</textarea>
+  <div class="act">
+    <button class="btn" id="copy-listing">コピーする</button>
+    <button class="btn sub" data-status="${it.id}|listed">出品中にする</button>
+  </div>
+  <div class="sp"></div>`);
+}
+
+function openMemberForm(id){
+  const m=id?memberOf(id):null;
+  openSheet(`
+  <div class="shead"><h3>${m?'家族を編集':'家族を追加'}</h3><button class="x" data-close>閉じる</button></div>
+  <label class="f" for="m-name">名前・呼び名</label>
+  <input type="text" id="m-name" value="${esc(m?.name||'')}" placeholder="そうた / ママ など">
+  <label class="f" for="m-bd">生年月日（子どもは必須。年齢からサイズアウトを判定します）</label>
+  <input type="date" id="m-bd" value="${m?.birthday||''}">
+  <label class="f">今のサイズ</label>
+  <div class="chips" id="m-size">
+    ${KID_SIZES.concat(ADULT_SIZES).map(s=>
+      `<button class="chip" data-msize="${s}" aria-pressed="${String(m?.currentSize||'')===String(s)}">${s}</button>`).join('')}
+  </div>
+  <div class="act">
+    <button class="btn wide" data-savemember="${m?.id||''}">保存する</button>
+  </div>
+  ${m?`<div class="act"><button class="btn ghost wide" data-delmember="${m.id}" style="color:var(--danger)">この家族を削除</button></div>`:''}
+  <div class="sp"></div>`);
+  if(m?.currentSize) S._msize=String(m.currentSize);
+  else S._msize=null;
+}
+
+function openEdit(id){
+  const it=S.items.find(i=>i.id===id); if(!it) return;
+  const mem=memberOf(it.memberId);
+  const kid=(ageOf(mem)??99)<=14;
+  const sizes=kid?KID_SIZES.map(String):ADULT_SIZES;
+  S._edit={size:it.size,color:it.color,season:[...(it.season||[])],memberId:it.memberId,category:it.category};
+  openSheet(`
+  <div class="shead"><h3>編集</h3><button class="x" data-close>閉じる</button></div>
+  <label class="f">だれの服</label>
+  <div class="chips" id="e-mem">${S.members.map(m=>
+    `<button class="chip" data-emem="${m.id}" aria-pressed="${it.memberId===m.id}">${esc(m.name)}</button>`).join('')}</div>
+  <label class="f">カテゴリ</label>
+  <div class="catgrid" id="e-cat">${CATS.map(c=>
+    `<button data-ecat="${c.id}" aria-pressed="${it.category===c.id}"><span class="g">${c.g}</span>${c.n}</button>`).join('')}</div>
+  <label class="f">サイズ</label>
+  <div class="chips" id="e-size">${sizes.map(s=>
+    `<button class="chip" data-esize="${s}" aria-pressed="${String(it.size)===String(s)}">${s}</button>`).join('')}</div>
+  <label class="f">色</label>
+  <div class="chips" id="e-color">${COLORS.map(c=>
+    `<button class="chip" data-ecolor="${c.n}" aria-pressed="${it.color===c.n}"><span class="sw" style="background:${c.hex}"></span>${c.n}</button>`).join('')}</div>
+  <label class="f">シーズン</label>
+  <div class="chips" id="e-season">${SEASONS.map(s=>
+    `<button class="chip" data-eseason="${s}" aria-pressed="${(it.season||[]).includes(s)}">${s}</button>`).join('')}</div>
+  <label class="f" for="e-brand">ブランド</label>
+  <input type="text" id="e-brand" value="${esc(it.brand||'')}">
+  <label class="f" for="e-price">購入価格</label>
+  <input type="number" id="e-price" inputmode="numeric" value="${it.price??''}">
+  <label class="f" for="e-pdate">購入日</label>
+  <input type="date" id="e-pdate" value="${it.purchaseDate||''}">
+  <div class="act"><button class="btn wide" data-saveedit="${it.id}">保存する</button></div>
+  <div class="sp"></div>`);
+}
+
+/* ============================================================
+   操作
+   ============================================================ */
+async function wearItem(id){
+  const it=S.items.find(i=>i.id===id); if(!it) return;
+  const t=today();
+  const exist=S.wears.find(w=>w.itemId===id&&w.date===t);
+  if(exist){
+    await dbDel('wears',exist.id);
+    it.wearCount=Math.max(0,(it.wearCount||0)-1);
+    const rest=S.wears.filter(w=>w.itemId===id&&w.id!==exist.id).map(w=>w.date).sort();
+    it.lastWorn=rest.length?rest[rest.length-1]:null;
+    await dbPut('items',it);
+    toast('記録を取り消しました');
+  }else{
+    await dbPut('wears',{id:uid(),itemId:id,date:t});
+    it.wearCount=(it.wearCount||0)+1;
+    it.lastWorn=t;
+    await dbPut('items',it);
+    toast('今日着た服に記録しました');
+  }
+  await reload(); render();
+}
+
+/* 再描画で消えないよう、テキスト入力をdraftへ退避 */
+function syncAdd(){
+  if(!$('#d-brand')) return;
+  S.draft={...(S.draft||{}),
+    brand:$('#d-brand').value,
+    price:$('#d-price').value,
+    purchaseDate:$('#d-pdate').value};
+}
+
+async function saveDraft(keepGoing){
+  syncAdd();
+  const d=S.draft||{};
+  const mid=d.memberId??S.lastUsed.memberId??S.members[0]?.id;
+  if(!mid){ toast('家族を先に登録してください'); return }
+  if(!d.category){ toast('カテゴリを選んでください'); return }
+
+  let photoId=null;
+  if(d.blob){ photoId=uid(); await dbPut('photos',{id:photoId,blob:d.blob}) }
+
+  const it={
+    id:uid(), memberId:mid, category:d.category,
+    size:String(d.size??memberOf(mid)?.currentSize??''),
+    color:d.color||null, brand:(d.brand||'').trim()||null,
+    price:d.price?Number(d.price):null,
+    purchaseDate:d.purchaseDate||null,
+    season:d.season||[], status:'active',
+    wearCount:0, lastWorn:null, addedAt:today()
+  };
+  await dbPut('items',it);
+  S.lastUsed={memberId:mid,category:d.category};
+  if(d.photoURL) URL.revokeObjectURL(d.photoURL);
+  S.draft = keepGoing ? {memberId:mid,category:d.category,size:d.size,season:d.season} : null;
+  await reload();
+  toast('保存しました');
+  if(keepGoing){ renderAdd(); window.scrollTo(0,0) }
+  else go('closet');
+}
+
+async function exportData(withPhotos){
+  const data={version:1,exportedAt:new Date().toISOString(),
+    members:S.members,items:S.items,wears:S.wears,photos:[]};
+  if(withPhotos){
+    const ps=await dbAll('photos');
+    for(const p of ps){
+      const b64=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(p.blob)});
+      data.photos.push({id:p.id,dataURL:b64});
+    }
+  }
+  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`closet-${today()}${withPhotos?'-full':''}.json`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast(withPhotos?'写真ごと書き出しました':'データを書き出しました');
+}
+async function importData(file){
+  try{
+    const txt=await file.text();
+    const d=JSON.parse(txt);
+    if(!d||!Array.isArray(d.items)) throw new Error('形式が違います');
+    for(const m of (d.members||[])) await dbPut('members',m);
+    for(const i of d.items) await dbPut('items',i);
+    for(const w of (d.wears||[])) await dbPut('wears',w);
+    for(const p of (d.photos||[])){
+      const res=await fetch(p.dataURL); const blob=await res.blob();
+      await dbPut('photos',{id:p.id,blob});
+    }
+    urlCache.clear();
+    await reload(); render();
+    toast('読み込みました');
+  }catch(e){ toast('読み込めませんでした') }
+}
+
+/* ============================================================
+   イベント
+   ============================================================ */
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing');
+  if(!t) return;
+  const g=n=>t.getAttribute(n);
+
+  if(g('data-tab')) return go(g('data-tab'));
+  if(g('data-go'))  return go(g('data-go'));
+  if(g('data-close')) return closeSheet();
+
+  if(g('data-fm')){ S.fMember=g('data-fm'); return renderCloset() }
+  if(g('data-fc')){ S.fCat=g('data-fc');   return renderCloset() }
+  if(g('data-tmem')){ S._todayMem=g('data-tmem'); return renderToday() }
+
+  if(g('data-wear'))  return wearItem(g('data-wear'));
+  if(g('data-wear2')){ await wearItem(g('data-wear2')); return closeSheet() }
+  if(g('data-item'))  return openItem(g('data-item'));
+  if(g('data-member'))return openMemberForm(g('data-member'));
+  if(t.id==='add-member') return openMemberForm(null);
+
+  /* --- 登録フォーム --- */
+  if(g('data-dmem')){ syncAdd(); S.draft={...(S.draft||{}),memberId:g('data-dmem'),size:undefined}; return renderAdd() }
+  if(g('data-dcat')){ syncAdd(); S.draft={...(S.draft||{}),category:g('data-dcat')}; return renderAdd() }
+  if(g('data-dsize')){ syncAdd(); S.draft={...(S.draft||{}),size:g('data-dsize')}; return renderAdd() }
+  if(g('data-dcolor')){ syncAdd(); S.draft={...(S.draft||{}),color:g('data-dcolor'),autoColor:false}; return renderAdd() }
+  if(g('data-dseason')){
+    syncAdd();
+    const s=g('data-dseason'); const cur=new Set(S.draft?.season||[]);
+    cur.has(s)?cur.delete(s):cur.add(s);
+    S.draft={...(S.draft||{}),season:[...cur]}; return renderAdd();
+  }
+  if(t.id==='save-next') return saveDraft(true);
+  if(t.id==='save-done') return saveDraft(false);
+
+  /* --- 家族フォーム --- */
+  if(g('data-msize')){
+    S._msize=g('data-msize');
+    $('#m-size').querySelectorAll('[data-msize]').forEach(b=>
+      b.setAttribute('aria-pressed', b.getAttribute('data-msize')===S._msize));
+    return;
+  }
+  if(g('data-savemember')!==null&&t.hasAttribute('data-savemember')){
+    const id=g('data-savemember')||uid();
+    const name=($('#m-name').value||'').trim();
+    if(!name){ toast('名前を入れてください'); return }
+    const exist=memberOf(id);
+    await dbPut('members',{id,name,birthday:$('#m-bd').value||null,
+      currentSize:S._msize||exist?.currentSize||null,
+      order:exist?.order??S.members.length});
+    await reload(); closeSheet(); render(); toast('保存しました');
+    return;
+  }
+  if(g('data-delmember')){
+    if(!confirm('この家族と、その服の持ち主情報が消えます。よろしいですか？')) return;
+    await dbDel('members',g('data-delmember'));
+    await reload(); closeSheet(); render(); toast('削除しました');
+    return;
+  }
+
+  /* --- 編集フォーム --- */
+  if(g('data-emem')||g('data-ecat')||g('data-esize')||g('data-ecolor')||g('data-eseason')){
+    const grp=g('data-emem')?'e-mem':g('data-ecat')?'e-cat':g('data-esize')?'e-size':g('data-ecolor')?'e-color':'e-season';
+    if(grp==='e-season'){
+      const cur=new Set(S._edit.season||[]); const v=g('data-eseason');
+      cur.has(v)?cur.delete(v):cur.add(v); S._edit.season=[...cur];
+      t.setAttribute('aria-pressed',cur.has(v));
+    }else{
+      const key={'e-mem':'memberId','e-cat':'category','e-size':'size','e-color':'color'}[grp];
+      const attr={'e-mem':'data-emem','e-cat':'data-ecat','e-size':'data-esize','e-color':'data-ecolor'}[grp];
+      S._edit[key]=t.getAttribute(attr);
+      $('#'+grp).querySelectorAll('['+attr+']').forEach(b=>
+        b.setAttribute('aria-pressed', b.getAttribute(attr)===S._edit[key]));
+    }
+    return;
+  }
+  if(g('data-saveedit')){
+    const it=S.items.find(i=>i.id===g('data-saveedit')); if(!it) return;
+    Object.assign(it,{
+      memberId:S._edit.memberId, category:S._edit.category,
+      size:S._edit.size, color:S._edit.color, season:S._edit.season,
+      brand:($('#e-brand').value||'').trim()||null,
+      price:$('#e-price').value?Number($('#e-price').value):null,
+      purchaseDate:$('#e-pdate').value||null
+    });
+    await dbPut('items',it); await reload(); closeSheet(); render(); toast('保存しました');
+    return;
+  }
+
+  /* --- 詳細アクション --- */
+  if(g('data-listing')) return openListing(g('data-listing'));
+  if(g('data-edit'))    return openEdit(g('data-edit'));
+  if(t.id==='copy-listing'){
+    const ta=$('#lt');
+    try{ await navigator.clipboard.writeText(ta.value); toast('コピーしました') }
+    catch(err){ ta.select(); document.execCommand('copy'); toast('コピーしました') }
+    return;
+  }
+  if(g('data-handdown')){
+    const it=S.items.find(i=>i.id===g('data-handdown')); const to=handDownTarget(it);
+    if(!it||!to) return;
+    it.memberId=to.id; it.handedDown=true;
+    await dbPut('items',it); await reload(); closeSheet(); render();
+    toast(to.name+'さんへ移しました');
+    return;
+  }
+  if(g('data-status')){
+    const [id,st]=g('data-status').split('|');
+    const it=S.items.find(i=>i.id===id); if(!it) return;
+    it.status=st; await dbPut('items',it); await reload(); closeSheet(); render();
+    toast(st==='sold'?'売却済みにしました':st==='listed'?'出品中にしました':'戻しました');
+    return;
+  }
+  if(g('data-del')){
+    if(!confirm('この服を削除します。よろしいですか？')) return;
+    const it=S.items.find(i=>i.id===g('data-del'));
+    if(it?.photoId) await dbDel('photos',it.photoId);
+    await dbDel('items',g('data-del'));
+    await reload(); closeSheet(); render(); toast('削除しました');
+    return;
+  }
+
+  /* --- 設定 --- */
+  if(t.id==='exp-meta') return exportData(false);
+  if(t.id==='exp-full') return exportData(true);
+  if(t.id==='imp')      return $('#impfile').click();
+});
+
+$('#scrim').addEventListener('click',closeSheet);
+
+document.addEventListener('change',async e=>{
+  if(e.target.id==='shot'){
+    const f=e.target.files?.[0]; if(!f) return;
+    $('#shot-label').innerHTML='<span class="g">⏳</span><span>読み込み中…</span>';
+    try{
+      const {blob,color}=await processPhoto(f);
+      if(S.draft?.photoURL) URL.revokeObjectURL(S.draft.photoURL);
+      S.draft={...(S.draft||{}),blob,photoURL:URL.createObjectURL(blob),
+        color:S.draft?.autoColor===false?S.draft.color:(color||S.draft?.color),
+        autoColor:S.draft?.autoColor===false?false:!!color};
+      renderAdd();
+    }catch(err){ toast('写真を読み込めませんでした'); renderAdd() }
+    e.target.value='';
+    return;
+  }
+  if(e.target.id==='impfile'){
+    const f=e.target.files?.[0]; if(f) await importData(f);
+    e.target.value='';
+  }
+});
+
+/* ============================================================
+   起動
+   ============================================================ */
+(async function init(){
+  try{
+    await openDB();
+    await reload();
+    go('today');
+  }catch(e){
+    document.getElementById('app').innerHTML=
+      '<div class="empty"><span class="g">⚠️</span><p>データベースを開けませんでした。<br>プライベートブラウズを解除して、もう一度開いてください。</p></div>';
+  }
+})();
+</script>
+</body>
+</html>
