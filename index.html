@@ -192,6 +192,19 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
   font-weight:600;z-index:80;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.on{opacity:1}
 .sp{height:8px}
+.fc-head{display:flex;flex-direction:column;gap:2px;padding-bottom:10px;border-bottom:1px solid var(--line2);margin-bottom:6px}
+.fc-head b{font-size:15px;font-weight:700}
+.fc-head span{font-size:11.5px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.fc-row{display:flex;align-items:baseline;gap:10px;padding:7px 0}
+.fc-row b{font-size:15px;font-weight:700;min-width:58px}
+.fc-row span{font-size:12.5px;color:var(--ink2);flex:1}
+.fc-row em{font-style:normal;font-size:12.5px;font-weight:700}
+.fc-row em.amber{color:var(--amber)}
+.fc-row em.indigo{color:var(--ink2);font-weight:500}
+.hist{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line2);font-size:13px}
+.hist b{font-variant-numeric:tabular-nums;min-width:66px}
+.hist span{flex:1;color:var(--ink2);font-size:12px}
+.hist button{color:var(--danger);font-size:12px;font-weight:600;padding:4px 8px}
 .hr{height:1px;background:var(--line);margin:18px 0}
 .act{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .act .btn{flex:1;min-width:120px}
@@ -273,11 +286,17 @@ const KID_SIZES = [80,90,100,110,120,130,140,150,160];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL','F'];
 const STALE_DAYS = 120;      // これ以上着ていなければ「眠っている服」
 const MERCARI_MIN = 300;
+const SIZE_MARGIN = 5;       // 「110サイズ」は身長115cmくらいまで着られる、という目安
+/* 年齢別の年間身長増加量（cm/年）の目安。実測が2回以上あればそちらを優先する */
+const GROWTH_BY_AGE = [
+  [0,25],[1,12],[2,8],[3,7],[4,6.5],[5,6.5],[6,6],[7,6],[8,6],
+  [9,6],[10,6.5],[11,7],[12,6.5],[13,5],[14,3],[15,1.5],[16,0.8],[17,0.4],[18,0]
+];
 
 /* ============================================================
    IndexedDB
    ============================================================ */
-const DB_NAME='kazoku-closet', DB_VER=1;
+const DB_NAME='kazoku-closet', DB_VER=2;
 let db=null;
 
 function openDB(){
@@ -295,6 +314,10 @@ function openDB(){
         s.createIndex('itemId','itemId',{unique:false});
       }
       if(!d.objectStoreNames.contains('photos')) d.createObjectStore('photos',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('growth')){
+        const s=d.createObjectStore('growth',{keyPath:'id'});
+        s.createIndex('memberId','memberId',{unique:false});
+      }
     };
     r.onsuccess=()=>{db=r.result;res(db)};
     r.onerror=()=>rej(r.error);
@@ -310,7 +333,7 @@ function dbGet(store,id){return new Promise((res,rej)=>{const r=db.transaction(s
    状態
    ============================================================ */
 const S = {
-  members:[], items:[], wears:[],
+  members:[], items:[], wears:[], growth:[],
   view:'today',
   fMember:'all', fCat:'all',
   draft:null,          // 登録中の1着
@@ -328,10 +351,11 @@ async function photoURL(id){
   return u;
 }
 async function reload(){
-  const [m,i,w]=await Promise.all([dbAll('members'),dbAll('items'),dbAll('wears')]);
+  const [m,i,w,gr]=await Promise.all([dbAll('members'),dbAll('items'),dbAll('wears'),dbAll('growth')]);
   S.members=m.sort((a,b)=>(a.order??0)-(b.order??0));
   S.items=i;
   S.wears=w;
+  S.growth=gr;
 }
 
 /* ============================================================
@@ -423,14 +447,69 @@ function guessColor(cx,w,h){
 /* ============================================================
    判定ロジック
    ============================================================ */
+/* ---- 身長と成長のモデル ---------------------------------- */
+
+/* そのメンバーの身長記録（古い順） */
+function heightsOf(mid){
+  return S.growth.filter(g=>g.memberId===mid).sort((a,b)=>a.date.localeCompare(b.date));
+}
+/* 年齢から平均的な年間成長量を引く */
+function avgGrowth(age){
+  if(age===null||age===undefined) return null;
+  let r=GROWTH_BY_AGE[0][1];
+  for(const [a,v] of GROWTH_BY_AGE){ if(age>=a) r=v }
+  return r;
+}
+/* 現在の推定身長と成長ペース。記録がなければ null */
+function growthInfo(m){
+  if(!m) return null;
+  const hs=heightsOf(m.id);
+  if(!hs.length) return null;
+  const last=hs[hs.length-1];
+  let rate=null, source='平均';
+  if(hs.length>=2){
+    const first=hs[0];
+    const days=(new Date(last.date+'T00:00:00')-new Date(first.date+'T00:00:00'))/86400000;
+    if(days>=60){
+      const r=(last.height-first.height)/days*365;
+      if(r>0.3&&r<30){ rate=r; source='実測' }
+    }
+  }
+  if(rate===null) rate=avgGrowth(ageOf(m));
+  if(rate===null) return null;
+  const elapsedY=Math.max(0,(daysSince(last.date)||0)/365);
+  const nowH=last.height+rate*elapsedY;
+  return {measured:last.height, measuredAt:last.date, nowH, rate, source, count:hs.length};
+}
+/* 身長 → 今ちょうど良いサイズ（10cm刻み） */
+function fitSize(h){ return Math.min(160,Math.max(80,Math.round(h/10)*10)) }
+/* そのサイズがあと何ヶ月着られるか。すでに越えていれば負の値 */
+function monthsLeft(m,size){
+  const g=growthInfo(m); if(!g) return null;
+  const s=Number(size); if(!Number.isFinite(s)) return null;
+  if(g.rate<=0) return 999;
+  return (s+SIZE_MARGIN-g.nowH)/g.rate*12;
+}
+function monthsLabel(mo){
+  if(mo===null) return null;
+  if(mo<=0)  return 'サイズアウト';
+  if(mo<1)   return 'あと1ヶ月未満';
+  if(mo>=24) return 'まだ余裕あり';
+  return 'あと約'+Math.round(mo)+'ヶ月';
+}
+
+/* ---- 判定 ------------------------------------------------ */
 function isActive(it){ return (it.status||'active')==='active' }
 
-/* サイズアウト：本人の現在サイズより小さい数値サイズの服 */
+/* サイズアウト：身長記録があれば身長で、なければ登録サイズで判定 */
 function isOutgrown(it){
   if(!isActive(it)) return false;
   const m=memberOf(it.memberId); if(!m) return false;
-  const cur=sizeNum(m.currentSize), s=sizeNum(it.size);
-  return cur!==null && s!==null && s < cur;
+  const s=sizeNum(it.size); if(s===null) return false;
+  const g=growthInfo(m);
+  if(g) return (s+SIZE_MARGIN) < g.nowH;
+  const cur=sizeNum(m.currentSize);
+  return cur!==null && s<cur;
 }
 /* 眠っている服 */
 function isStale(it){
@@ -439,25 +518,38 @@ function isStale(it){
   const d=daysSince(it.lastWorn||it.addedAt);
   return d!==null && d>=STALE_DAYS;
 }
+/* 今のその人のサイズ（身長優先） */
+function currentSizeOf(m){
+  const g=growthInfo(m);
+  if(g) return fitSize(g.nowH);
+  return sizeNum(m?.currentSize);
+}
 /* おさがり：サイズアウト品を、今それが合う別メンバーへ */
 function handDownTarget(it){
   const s=sizeNum(it.size); if(s===null) return null;
-  const owner=memberOf(it.memberId);
   for(const m of S.members){
     if(m.id===it.memberId) continue;
-    const cur=sizeNum(m.currentSize);
+    const cur=currentSizeOf(m);
     if(cur===null) continue;
     if(s>=cur && s<=cur+10) return m;     // 今ぴったり〜1サイズ上まで
   }
-  return owner?null:null;
+  return null;
 }
-/* 次のサイズアウト予測（子ども：1年で約1サイズ=10cm と仮定） */
+/* サイズ別の残り期間。持っている服をサイズごとにまとめて、近い順に返す */
 function outgrowForecast(m){
-  const cur=sizeNum(m.currentSize); const age=ageOf(m);
-  if(cur===null||age===null||age>14) return null;
-  const n=S.items.filter(i=>i.memberId===m.id&&isActive(i)&&sizeNum(i.size)===cur).length;
-  if(!n) return null;
-  return {size:cur,count:n,months:12};
+  const g=growthInfo(m); if(!g) return null;
+  const age=ageOf(m); if(age!==null&&age>15) return null;
+  const bySize=new Map();
+  for(const i of S.items){
+    if(i.memberId!==m.id||!isActive(i)) continue;
+    const s=sizeNum(i.size); if(s===null) continue;
+    bySize.set(s,(bySize.get(s)||0)+1);
+  }
+  const rows=[...bySize.entries()]
+    .map(([size,count])=>({size,count,months:monthsLeft(m,size)}))
+    .filter(r=>r.months!==null&&r.months<18)
+    .sort((a,b)=>a.months-b.months);
+  return {g,age,rows};
 }
 /* メルカリ想定価格（目安） */
 function estPrice(it){
@@ -574,10 +666,32 @@ function renderToday(){
   h+=`<div class="filters" id="today-mem"></div><div class="grid" id="today-grid"></div>`;
 
   // サイズアウト予測
-  const fc=S.members.map(m=>({m,f:outgrowForecast(m)})).filter(x=>x.f);
+  const kids=S.members.filter(m=>{const a=ageOf(m); return a!==null&&a<=15});
+  const noHeight=kids.filter(m=>!heightsOf(m.id).length);
+  const fc=kids.map(m=>({m,f:outgrowForecast(m)})).filter(x=>x.f&&x.f.rows.length);
+
   if(fc.length){
-    h+=`<h2 class="sec">そろそろサイズアウト</h2>`;
-    h+=fc.map(({m,f})=>`<div class="note amber" style="margin-bottom:8px">${esc(m.name)}さん（${ageOf(m)}歳）の ${f.size}cm の服が ${f.count}着。この1年で入れ替え時期がきます。</div>`).join('');
+    h+=`<h2 class="sec">サイズアウト予測</h2>`;
+    h+=fc.map(({m,f})=>{
+      const g=f.g;
+      const rows=f.rows.map(r=>{
+        const lab=monthsLabel(r.months);
+        const cls=r.months<=0?'amber':r.months<=3?'amber':'indigo';
+        return `<div class="fc-row"><b class="num">${r.size}cm</b>
+          <span class="num">${r.count}着</span>
+          <em class="${cls}">${lab}</em></div>`;
+      }).join('');
+      return `<div class="card" style="margin-bottom:10px">
+        <div class="fc-head"><b>${esc(m.name)}</b>
+          <span>${f.age}歳・推定 ${g.nowH.toFixed(0)}cm・年 ${g.rate.toFixed(1)}cm（${g.source}）</span></div>
+        ${rows}
+        <div class="tiny muted" style="margin-top:10px">今ちょうど良いのは ${fitSize(g.nowH)}cm です。${g.source==='平均'?'身長を2回以上記録すると、この子の実際のペースで計算します。':''}</div>
+      </div>`;
+    }).join('');
+  }
+  if(noHeight.length){
+    h+=`<h2 class="sec">身長を記録すると予測できます</h2>`;
+    h+=noHeight.map(m=>`<button class="note amber" data-member="${m.id}" style="display:block;width:100%;text-align:left;margin-bottom:8px">${esc(m.name)}さんの身長がまだ未記録です。タップして入力すると、持っている服があと何ヶ月着られるか出ます。</button>`).join('');
   }
   $('#today-body').innerHTML=h;
 
@@ -764,10 +878,13 @@ function renderSet(){
   }else{
     h+=S.members.map(m=>{
       const a=ageOf(m), n=S.items.filter(i=>i.memberId===m.id&&isActive(i)).length;
+      const gi=growthInfo(m);
+      const info=gi?`${gi.nowH.toFixed(0)}cm・${fitSize(gi.nowH)}サイズ・`
+                   :(m.currentSize?'現在 '+esc(m.currentSize)+'・':'');
       return `<button class="row" data-member="${m.id}" style="width:100%;text-align:left">
         <span class="th">${a!==null&&a<=14?'🧒':'🧑'}</span>
         <span class="body"><b>${esc(m.name)}</b>
-        <span>${a!==null?a+'歳・':''}${m.currentSize?'現在 '+esc(m.currentSize)+'・':''}${n}着</span></span>
+        <span>${a!==null?a+'歳・':''}${info}${n}着</span></span>
       </button>`}).join('');
   }
   h+=`<div class="act"><button class="btn ghost wide" id="add-member">家族を追加する</button></div></div>`;
@@ -783,9 +900,10 @@ function renderSet(){
   </div>`;
 
   h+=`<h2 class="sec">このアプリについて</h2><div class="card tiny muted">
-    家族ローゼット（かぞクロ）v0.1<br>
+    家族ローゼット（かぞクロ）v0.2<br>
     子どものサイズアウトを、手遅れになる前に教えるアプリです。<br><br>
-    コーデ提案は、服のデータが貯まってから v0.2 で追加する予定です。
+    身長の記録が2回以上あると、その子の実際の成長ペースで予測します。<br>
+    コーデ提案は、服のデータが貯まってから追加する予定です。
   </div>`;
   $('#set-body').innerHTML=h;
 }
@@ -811,6 +929,8 @@ async function openItem(id){
   const est=estPrice(it);
   const cpw=(it.price&&it.wearCount)?Math.round(Number(it.price)/it.wearCount):null;
   const hd=isOutgrown(it)?handDownTarget(it):null;
+  const mo=(ageOf(m)??99)<=15?monthsLeft(m,sizeNum(it.size)):null;
+  const moLab=mo===null?null:monthsLabel(mo);
 
   openSheet(`
   <div class="shead"><h3>${esc([c.n,it.size].filter(Boolean).join(' '))}</h3><button class="x" data-close>閉じる</button></div>
@@ -824,6 +944,7 @@ async function openItem(id){
     <dt>最後に着た日</dt><dd>${d===null?'まだ着ていません':(d===0?'今日':d+'日前')}</dd>
     <dt>購入価格</dt><dd>${yen(it.price)}</dd>
     ${cpw!==null?`<dt>1回あたり</dt><dd>${yen(cpw)}</dd>`:''}
+    ${moLab?`<dt>着られる期間</dt><dd>${moLab}</dd>`:''}
   </dl>
   ${hd?`<div class="note ok">${esc(hd.name)}さんの今のサイズに合います。おさがりに回せます。</div>`:''}
   ${isOutgrown(it)&&!hd?`<div class="note amber">サイズアウトしています。${est?'出品の目安は '+yen(est)+' 前後です。':''}</div>`:''}
@@ -863,13 +984,26 @@ function openListing(id){
 
 function openMemberForm(id){
   const m=id?memberOf(id):null;
+  const hs=m?heightsOf(m.id).slice().reverse():[];
+  const g=m?growthInfo(m):null;
   openSheet(`
   <div class="shead"><h3>${m?'家族を編集':'家族を追加'}</h3><button class="x" data-close>閉じる</button></div>
   <label class="f" for="m-name">名前・呼び名</label>
   <input type="text" id="m-name" value="${esc(m?.name||'')}" placeholder="そうた / ママ など">
   <label class="f" for="m-bd">生年月日（子どもは必須。年齢からサイズアウトを判定します）</label>
   <input type="date" id="m-bd" value="${m?.birthday||''}">
-  <label class="f">今のサイズ</label>
+
+  <label class="f" for="m-height">身長を記録する（cm）</label>
+  <input type="number" id="m-height" inputmode="decimal" step="0.1" placeholder="122.5">
+  <label class="f" for="m-hdate">計測日</label>
+  <input type="date" id="m-hdate" value="${today()}">
+  <div class="note indigo tiny" style="margin-top:10px">母子手帳や学校の記録から過去の身長も入れてください。<b>2回以上あると、この子の実際の成長ペースで予測します。</b></div>
+  ${hs.length?`<div style="margin-top:12px">${hs.map(r=>
+    `<div class="hist"><b>${r.height}cm</b><span>${r.date}</span>
+     <button data-delheight="${r.id}">削除</button></div>`).join('')}</div>`:''}
+  ${g?`<div class="tiny muted" style="margin-top:10px">現在の推定身長 ${g.nowH.toFixed(1)}cm ／ 年 ${g.rate.toFixed(1)}cm ペース（${g.source}）／ 適正サイズ ${fitSize(g.nowH)}cm</div>`:''}
+
+  <label class="f">今のサイズ（身長を記録していない場合の代わり）</label>
   <div class="chips" id="m-size">
     ${KID_SIZES.concat(ADULT_SIZES).map(s=>
       `<button class="chip" data-msize="${s}" aria-pressed="${String(m?.currentSize||'')===String(s)}">${s}</button>`).join('')}
@@ -881,6 +1015,7 @@ function openMemberForm(id){
   <div class="sp"></div>`);
   if(m?.currentSize) S._msize=String(m.currentSize);
   else S._msize=null;
+  S._mopen=m?.id||null;
 }
 
 function openEdit(id){
@@ -979,8 +1114,8 @@ async function saveDraft(keepGoing){
 }
 
 async function exportData(withPhotos){
-  const data={version:1,exportedAt:new Date().toISOString(),
-    members:S.members,items:S.items,wears:S.wears,photos:[]};
+  const data={version:2,exportedAt:new Date().toISOString(),
+    members:S.members,items:S.items,wears:S.wears,growth:S.growth,photos:[]};
   if(withPhotos){
     const ps=await dbAll('photos');
     for(const p of ps){
@@ -1004,6 +1139,7 @@ async function importData(file){
     for(const m of (d.members||[])) await dbPut('members',m);
     for(const i of d.items) await dbPut('items',i);
     for(const w of (d.wears||[])) await dbPut('wears',w);
+    for(const gr of (d.growth||[])) await dbPut('growth',gr);
     for(const p of (d.photos||[])){
       const res=await fetch(p.dataURL); const blob=await res.blob();
       await dbPut('photos',{id:p.id,blob});
@@ -1018,7 +1154,7 @@ async function importData(file){
    イベント
    ============================================================ */
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
@@ -1065,7 +1201,19 @@ document.addEventListener('click',async e=>{
     await dbPut('members',{id,name,birthday:$('#m-bd').value||null,
       currentSize:S._msize||exist?.currentSize||null,
       order:exist?.order??S.members.length});
+    const hv=parseFloat($('#m-height')?.value);
+    const hd=$('#m-hdate')?.value||today();
+    if(Number.isFinite(hv)&&hv>=40&&hv<=210){
+      const dup=S.growth.find(x=>x.memberId===id&&x.date===hd);
+      if(dup) await dbDel('growth',dup.id);
+      await dbPut('growth',{id:uid(),memberId:id,date:hd,height:Math.round(hv*10)/10});
+    }
     await reload(); closeSheet(); render(); toast('保存しました');
+    return;
+  }
+  if(g('data-delheight')){
+    await dbDel('growth',g('data-delheight'));
+    await reload(); openMemberForm(S._mopen); render();
     return;
   }
   if(g('data-delmember')){
