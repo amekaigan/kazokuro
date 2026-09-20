@@ -202,6 +202,26 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
   font-weight:600;z-index:80;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.on{opacity:1}
 .sp{height:8px}
+.cam{position:fixed;inset:0;z-index:70;background:#0B1418;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  padding:calc(var(--safe-t) + 16px) 16px calc(var(--safe-b) + 20px)}
+.cam.on{display:flex}
+.cam-stage{position:relative;width:100%;max-width:520px;aspect-ratio:1;
+  border-radius:18px;overflow:hidden;background:#000}
+.cam-stage video{width:100%;height:100%;object-fit:cover;display:block}
+.cam-guide{position:absolute;inset:4%;pointer-events:none}
+.cam-guide i{position:absolute;width:30px;height:30px;border:3px solid rgba(255,255,255,.92)}
+.cam-guide i:nth-child(1){top:0;left:0;border-right:none;border-bottom:none;border-radius:8px 0 0 0}
+.cam-guide i:nth-child(2){top:0;right:0;border-left:none;border-bottom:none;border-radius:0 8px 0 0}
+.cam-guide i:nth-child(3){bottom:0;left:0;border-right:none;border-top:none;border-radius:0 0 0 8px}
+.cam-guide i:nth-child(4){bottom:0;right:0;border-left:none;border-top:none;border-radius:0 0 8px 0}
+.cam-tip{margin:0;color:rgba(255,255,255,.82);font-size:13.5px;text-align:center;line-height:1.7}
+.cam-bar{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:520px}
+.cam-side{color:#fff;font-size:15px;font-weight:700;padding:14px 10px;min-width:88px;min-height:52px}
+.cam-shot{width:78px;height:78px;border-radius:50%;background:rgba(255,255,255,.22);
+  display:flex;align-items:center;justify-content:center}
+.cam-shot span{width:62px;height:62px;border-radius:50%;background:#fff;display:block}
+.cam-shot:active span{transform:scale(.9)}
 .stickybar{position:sticky;bottom:calc(var(--nav-h) + var(--safe-b) + 10px);z-index:20;
   display:flex;gap:9px;margin-top:16px;padding:11px;border-radius:16px;
   background:var(--surface);border:1px solid var(--line);
@@ -272,6 +292,18 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 <nav class="tabs" id="tabs"></nav>
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet"><div class="handle"></div><div class="inner" id="sheet-inner"></div></div>
+<div class="cam" id="cam">
+  <div class="cam-stage">
+    <video id="cam-video" playsinline muted autoplay></video>
+    <div class="cam-guide"><i></i><i></i><i></i><i></i></div>
+  </div>
+  <p class="cam-tip">平らな場所に広げて、枠いっぱいに入れてください。<br>手でしわを伸ばすときれいに写ります。</p>
+  <div class="cam-bar">
+    <button class="cam-side" id="cam-close">閉じる</button>
+    <button class="cam-shot" id="cam-shoot" aria-label="撮影"><span></span></button>
+    <button class="cam-side" id="cam-pick">写真から</button>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -363,8 +395,16 @@ const S = {
   view:'today',
   fMember:'all', fCat:'all',
   draft:null,          // 登録中の1着
-  lastUsed:{memberId:null,category:null}
+  lastUsed:{memberId:null,category:null},
+  settings:{normalize:true}
 };
+try{
+  const raw=localStorage.getItem('kazokuro-settings');
+  if(raw) Object.assign(S.settings,JSON.parse(raw));
+}catch(e){}
+function saveSettings(){
+  try{ localStorage.setItem('kazokuro-settings',JSON.stringify(S.settings)) }catch(e){}
+}
 const urlCache=new Map();
 
 async function photoURL(id){
@@ -431,17 +471,93 @@ async function loadBitmap(file){
     fr.onerror=rej; fr.readAsDataURL(file);
   });
 }
-async function processPhoto(file,max=900,q=0.72){
-  const src=await loadBitmap(file);
+const OUT_SIZE = 900;          // 仕上がりの一辺
+const SUBJECT_FILL = 0.84;     // 服が枠に占める割合。これで大きさが揃う
+
+/* 被写体の範囲を求める。背景と色が違う画素の広がりを見る */
+function subjectBox(cx,w,h,bg){
+  const d=cx.getImageData(0,0,w,h).data;
+  const col=new Int32Array(w), row=new Int32Array(h);
+  const TH=62;
+  for(let y=0;y<h;y+=2){
+    for(let x=0;x<w;x+=2){
+      const i=(y*w+x)*4;
+      if(Math.abs(d[i]-bg[0])+Math.abs(d[i+1]-bg[1])+Math.abs(d[i+2]-bg[2])>TH){ col[x]++; row[y]++ }
+    }
+  }
+  const colTh=Math.max(3,Math.round(h*0.012)), rowTh=Math.max(3,Math.round(w*0.012));
+  let minX=w,maxX=-1,minY=h,maxY=-1;
+  for(let x=0;x<w;x++) if(col[x]>colTh){ if(x<minX)minX=x; if(x>maxX)maxX=x }
+  for(let y=0;y<h;y++) if(row[y]>rowTh){ if(y<minY)minY=y; if(y>maxY)maxY=y }
+  if(maxX<0||maxY<0) return null;
+  const bw=maxX-minX, bh=maxY-minY;
+  const ratio=(bw*bh)/(w*h);
+  if(ratio<0.03||ratio>0.985) return null;   // 検出できなかったとみなす
+  return {minX,minY,bw,bh};
+}
+
+/* 背景を白に寄せ、服を中央に同じ大きさで切り出す */
+function normalize(work,wcx,w,h){
+  const bg=sampleEdge(wcx,w,h)||[235,235,235];
+  const box=subjectBox(wcx,w,h,bg);
+  let sx,sy,ss;
+  if(box){
+    ss=Math.max(box.bw,box.bh)/SUBJECT_FILL;
+    sx=box.minX+box.bw/2-ss/2;
+    sy=box.minY+box.bh/2-ss/2;
+  }else{
+    ss=Math.min(w,h); sx=(w-ss)/2; sy=(h-ss)/2;
+  }
+  const out=document.createElement('canvas');
+  out.width=OUT_SIZE; out.height=OUT_SIZE;
+  const ocx=out.getContext('2d',{willReadFrequently:true});
+  ocx.fillStyle='#ffffff'; ocx.fillRect(0,0,OUT_SIZE,OUT_SIZE);
+  ocx.drawImage(work,sx,sy,ss,ss,0,0,OUT_SIZE,OUT_SIZE);
+
+  // 背景が明るいときだけ、そこを白の基準にして色かぶりと露出を補正する
+  const lum=0.299*bg[0]+0.587*bg[1]+0.114*bg[2];
+  if(lum>85){
+    const t=246;
+    const gain=[t/Math.max(1,bg[0]),t/Math.max(1,bg[1]),t/Math.max(1,bg[2])]
+      .map(g=>Math.max(0.75,Math.min(1.9,g)));
+    const im=ocx.getImageData(0,0,OUT_SIZE,OUT_SIZE), od=im.data;
+    for(let i=0;i<od.length;i+=4){
+      od[i]  =Math.min(255,od[i]  *gain[0]);
+      od[i+1]=Math.min(255,od[i+1]*gain[1]);
+      od[i+2]=Math.min(255,od[i+2]*gain[2]);
+    }
+    ocx.putImageData(im,0,0);
+  }
+  return out;
+}
+
+/* 正規化しない場合：中央を正方形に切るだけ */
+function plainSquare(work,w,h){
+  const s=Math.min(w,h);
+  const out=document.createElement('canvas');
+  out.width=OUT_SIZE; out.height=OUT_SIZE;
+  const ocx=out.getContext('2d');
+  ocx.fillStyle='#ffffff'; ocx.fillRect(0,0,OUT_SIZE,OUT_SIZE);
+  ocx.drawImage(work,(w-s)/2,(h-s)/2,s,s,0,0,OUT_SIZE,OUT_SIZE);
+  return out;
+}
+
+/* File でも Canvas でも受け取り、正規化した JPEG と推定色を返す */
+async function processPhoto(source){
+  const isCanvas = source instanceof HTMLCanvasElement;
+  const src = isCanvas ? source : await loadBitmap(source);
   const sw=src.width||src.naturalWidth, sh=src.height||src.naturalHeight;
-  const sc=Math.min(1,max/Math.max(sw,sh));
+  const sc=Math.min(1,1200/Math.max(sw,sh));
   const w=Math.round(sw*sc), h=Math.round(sh*sc);
-  const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
-  const cx=cv.getContext('2d'); cx.drawImage(src,0,0,w,h);
-  const color=guessColor(cx,w,h);
-  const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',q));
-  if(src.close) src.close();
-  return {blob,color,w,h};
+  const work=document.createElement('canvas'); work.width=w; work.height=h;
+  const wcx=work.getContext('2d',{willReadFrequently:true});
+  wcx.drawImage(src,0,0,w,h);
+
+  const color=guessColor(wcx,w,h);
+  const out=S.settings.normalize ? normalize(work,wcx,w,h) : plainSquare(work,w,h);
+  const blob=await new Promise(r=>out.toBlob(r,'image/jpeg',0.78));
+  if(!isCanvas && src.close) src.close();
+  return {blob,color};
 }
 /* 外周から背景色を推定する（床・ベッド・テーブルなど） */
 function sampleEdge(cx,w,h){
@@ -831,10 +947,12 @@ function renderAdd(){
 
   $('#add-body').innerHTML=`
   <div class="card">
-    <label for="shot" class="shot ${d?.photoURL?'has':''}" id="shot-label">
-      ${d?.photoURL?`<img src="${d.photoURL}" alt="撮影した服">`:'<span class="g">📷</span><span>服を撮る / 写真を選ぶ</span>'}
-    </label>
+    <button class="shot ${d?.photoURL?'has':''}" id="shot-label">
+      ${d?.photoURL?`<img src="${d.photoURL}" alt="撮影した服">`:'<span class="g">📷</span><span>服を撮る</span>'}
+    </button>
     <input type="file" id="shot" accept="image/*" hidden>
+    ${d?.photoURL?'<div class="act"><button class="btn sub sm" id="shot-redo">撮り直す</button><button class="btn ghost sm" id="shot-pick">写真から選ぶ</button></div>'
+                 :'<div class="act"><button class="btn ghost" id="shot-pick">カメラロールの写真から選ぶ</button></div>'}
 
     <label class="f">だれの服</label>
     <div class="chips" id="d-mem">${S.members.map(m=>
@@ -936,6 +1054,11 @@ function renderSet(){
       </button>`}).join('');
   }
   h+=`<div class="act"><button class="btn ghost wide" id="add-member">家族を追加する</button></div></div>`;
+
+  h+=`<h2 class="sec">写真の仕上げ</h2><div class="card">
+    <p class="tiny muted" style="margin:0 0 12px">背景を白に近づけ、服を中央に同じ大きさで切り出します。明るさと色かぶりも揃えるので、一覧が整って見えます。うまく切り出せない写真があるときは切ってください。</p>
+    <div class="act"><button class="btn ${S.settings.normalize?'':'ghost'} wide" id="toggle-norm">${S.settings.normalize?'きれいに整える：オン':'きれいに整える：オフ'}</button></div>
+  </div>`;
 
   h+=`<h2 class="sec">バックアップ</h2><div class="card">
     <p class="tiny muted" style="margin:0 0 12px">データはこの端末のブラウザ内だけに保存されています。ブラウザのデータを消すと失われます。定期的に書き出してください。</p>
@@ -1206,10 +1329,55 @@ async function importData(file){
 }
 
 /* ============================================================
-   イベント
+   カメラ
    ============================================================ */
+let camStream=null;
+
+async function openCamera(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ $('#shot').click(); return }
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:1600},height:{ideal:1600}},
+      audio:false});
+  }catch(e){
+    toast('カメラを使えないので写真から選びます');
+    $('#shot').click(); return;
+  }
+  const v=$('#cam-video');
+  v.srcObject=camStream;
+  $('#cam').classList.add('on');
+  try{ await v.play() }catch(e){}
+}
+function closeCamera(){
+  if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null }
+  const v=$('#cam-video'); if(v) v.srcObject=null;
+  $('#cam').classList.remove('on');
+}
+async function shootCamera(){
+  const v=$('#cam-video');
+  const vw=v.videoWidth, vh=v.videoHeight;
+  if(!vw||!vh){ toast('もう一度お試しください'); return }
+  const s=Math.round(Math.min(vw,vh)*0.92);          // ガイド枠にあたる中央の正方形
+  const cv=document.createElement('canvas'); cv.width=s; cv.height=s;
+  cv.getContext('2d').drawImage(v,(vw-s)/2,(vh-s)/2,s,s,0,0,s,s);
+  closeCamera();
+  await acceptPhoto(cv);
+}
+/* 撮影でもファイル選択でも、ここを通す */
+async function acceptPhoto(source){
+  const lab=$('#shot-label');
+  if(lab) lab.innerHTML='<span class="g">⏳</span><span>仕上げています…</span>';
+  try{
+    const {blob,color}=await processPhoto(source);
+    if(S.draft?.photoURL) URL.revokeObjectURL(S.draft.photoURL);
+    S.draft={...(S.draft||{}),blob,photoURL:URL.createObjectURL(blob),
+      color:S.draft?.autoColor===false?S.draft.color:(color||S.draft?.color),
+      autoColor:S.draft?.autoColor===false?false:!!color};
+  }catch(err){ toast('写真を読み込めませんでした') }
+  if(S.view!=='add') go('add'); else renderAdd();
+}
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#toggle-norm');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
@@ -1237,6 +1405,15 @@ document.addEventListener('click',async e=>{
     const s=g('data-dseason'); const cur=new Set(S.draft?.season||[]);
     cur.has(s)?cur.delete(s):cur.add(s);
     S.draft={...(S.draft||{}),season:[...cur]}; return renderAdd();
+  }
+  if(t.id==='shot-label'||t.id==='shot-redo') return openCamera();
+  if(t.id==='shot-pick'||t.id==='cam-pick'){ closeCamera(); return $('#shot').click() }
+  if(t.id==='cam-close') return closeCamera();
+  if(t.id==='cam-shoot') return shootCamera();
+  if(t.id==='toggle-norm'){
+    S.settings.normalize=!S.settings.normalize; saveSettings(); renderSet();
+    toast(S.settings.normalize?'きれいに整えます':'撮ったままを使います');
+    return;
   }
   if(t.id==='save-next') return saveDraft(true);
   if(t.id==='save-done') return saveDraft(false);
@@ -1357,17 +1534,9 @@ $('#scrim').addEventListener('click',closeSheet);
 
 document.addEventListener('change',async e=>{
   if(e.target.id==='shot'){
-    const f=e.target.files?.[0]; if(!f) return;
-    $('#shot-label').innerHTML='<span class="g">⏳</span><span>読み込み中…</span>';
-    try{
-      const {blob,color}=await processPhoto(f);
-      if(S.draft?.photoURL) URL.revokeObjectURL(S.draft.photoURL);
-      S.draft={...(S.draft||{}),blob,photoURL:URL.createObjectURL(blob),
-        color:S.draft?.autoColor===false?S.draft.color:(color||S.draft?.color),
-        autoColor:S.draft?.autoColor===false?false:!!color};
-      renderAdd();
-    }catch(err){ toast('写真を読み込めませんでした'); renderAdd() }
+    const f=e.target.files?.[0];
     e.target.value='';
+    if(f) await acceptPhoto(f);
     return;
   }
   if(e.target.id==='impfile'){
