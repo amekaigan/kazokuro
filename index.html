@@ -35,13 +35,14 @@
 }
 *,*::before,*::after{box-sizing:inherit}
 html{-webkit-text-size-adjust:100%}
-html,body{margin:0;height:100%}
+html,body{margin:0;height:100%;overflow-x:hidden}
 body{
   background:var(--bg); color:var(--ink);
   font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
   font-size:15px; line-height:1.6; letter-spacing:.01em;
   padding-top:var(--safe-t);
   -webkit-font-smoothing:antialiased;
+  touch-action:manipulation;
 }
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;border:none;background:none;padding:0}
@@ -94,8 +95,14 @@ nav.tabs button .dot{position:absolute;margin-top:-26px;margin-left:16px;min-wid
 
 label.f{display:block;margin:14px 0 5px;font-size:12.5px;font-weight:600;color:var(--ink2)}
 input[type=text],input[type=number],input[type=date],select,textarea{
-  width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;
-  background:var(--surface2);font-size:16px}
+  display:block;
+  width:100%;max-width:100%;min-width:0;
+  padding:10px 12px;border:1px solid var(--line);border-radius:9px;
+  background:var(--surface2);font-size:16px;
+  -webkit-appearance:none;appearance:none}
+input[type=date]{min-height:44px;line-height:1.4}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 textarea{resize:vertical;line-height:1.7}
 
 .chips{display:flex;flex-wrap:wrap;gap:7px}
@@ -165,7 +172,8 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 .scrim{position:fixed;inset:0;background:rgba(8,18,22,.5);z-index:50;display:none}
 .scrim.on{display:block}
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;background:var(--bg);
-  border-radius:18px 18px 0 0;max-height:92vh;overflow-y:auto;display:none;
+  border-radius:18px 18px 0 0;max-height:92vh;overflow-y:auto;overflow-x:hidden;display:none;
+  overscroll-behavior:contain;
   padding:0 16px calc(var(--safe-b) + 24px);-webkit-overflow-scrolling:touch}
 .sheet.on{display:block}
 .sheet .handle{width:38px;height:4px;border-radius:2px;background:var(--line);margin:9px auto 4px}
@@ -201,6 +209,10 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 .fc-row em{font-style:normal;font-size:12.5px;font-weight:700}
 .fc-row em.amber{color:var(--amber)}
 .fc-row em.indigo{color:var(--ink2);font-weight:500}
+.row .th.av{color:#fff;font-size:20px;font-weight:700;border:none;line-height:1}
+.chip .mdot{display:inline-block;width:8px;height:8px;border-radius:5px;margin-right:6px;vertical-align:0}
+.chip[aria-pressed="true"] .mdot{background:#fff!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chip[aria-pressed="true"] .mdot{background:#0E1A20!important}}
 .hist{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line2);font-size:13px}
 .hist b{font-variant-numeric:tabular-nums;min-width:66px}
 .hist span{flex:1;color:var(--ink2);font-size:12px}
@@ -244,7 +256,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 
   <!-- ===== 設定 ===== -->
   <section class="view" id="v-set">
-    <header class="top"><h1>設定</h1><span class="sub">v0.1</span></header>
+    <header class="top"><h1>設定</h1><span class="sub">v0.2</span></header>
     <div id="set-body"></div>
   </section>
 
@@ -282,6 +294,13 @@ const COLORS = [
   {n:'ベージュ', hex:'#D6C3A5'}, {n:'柄物',     hex:'#B9AFA2'}
 ];
 const SEASONS = ['春','夏','秋','冬'];
+const MEMBER_COLORS = [
+  {n:'ブルー',  hex:'#3F79B8'}, {n:'グリーン',hex:'#3E8C63'},
+  {n:'オレンジ',hex:'#D2762F'}, {n:'ピンク',  hex:'#C96A8B'},
+  {n:'パープル',hex:'#7A62A8'}, {n:'イエロー',hex:'#C08A1C'},
+  {n:'レッド',  hex:'#B84B42'}, {n:'グレー',  hex:'#6B7B82'}
+];
+const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
 const KID_SIZES = [80,90,100,110,120,130,140,150,160];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL','F'];
 const STALE_DAYS = 120;      // これ以上着ていなければ「眠っている服」
@@ -417,30 +436,52 @@ async function processPhoto(file,max=900,q=0.72){
   if(src.close) src.close();
   return {blob,color,w,h};
 }
+/* 外周から背景色を推定する（床・ベッド・テーブルなど） */
+function sampleEdge(cx,w,h){
+  const ew=Math.max(1,Math.round(w*0.07)), eh=Math.max(1,Math.round(h*0.07));
+  const strips=[cx.getImageData(0,0,w,eh).data, cx.getImageData(0,h-eh,w,eh).data,
+                cx.getImageData(0,0,ew,h).data, cx.getImageData(w-ew,0,ew,h).data];
+  let r=0,g=0,b=0,n=0;
+  for(const d of strips) for(let i=0;i<d.length;i+=40){ r+=d[i];g+=d[i+1];b+=d[i+2];n++ }
+  return n?[r/n,g/n,b/n]:null;
+}
+/* 中央部の最頻色。bg を渡すとそれに近い画素を無視する */
+function tallyCenter(cx,w,h,bg){
+  const x0=Math.round(w*0.22), y0=Math.round(h*0.22);
+  const cw=Math.max(1,Math.round(w*0.56)), ch=Math.max(1,Math.round(h*0.56));
+  const d=cx.getImageData(x0,y0,cw,ch).data;
+  const buckets=new Map();
+  let kept=0;
+  for(let i=0;i<d.length;i+=16){
+    const r=d[i],g=d[i+1],b=d[i+2];
+    if(bg && Math.abs(r-bg[0])+Math.abs(g-bg[1])+Math.abs(b-bg[2])<54) continue;
+    const k=(r>>4)*256+(g>>4)*16+(b>>4);
+    const e=buckets.get(k)||[0,0,0,0];
+    e[0]+=r;e[1]+=g;e[2]+=b;e[3]++; buckets.set(k,e); kept++;
+  }
+  if(kept<60) return null;
+  let best=null,bc=0;
+  for(const e of buckets.values()){ if(e[3]>bc){bc=e[3];best=e} }
+  if(!best) return null;
+  return [best[0]/best[3], best[1]/best[3], best[2]/best[3]];
+}
+function nearestColorName(rgb){
+  const [r,g,b]=rgb;
+  let nearest=null,nd=1e9;
+  for(const c of COLORS){
+    if(c.n==='柄物') continue;
+    const cr=parseInt(c.hex.slice(1,3),16), cg=parseInt(c.hex.slice(3,5),16), cb=parseInt(c.hex.slice(5,7),16);
+    const dist=(r-cr)**2*0.3+(g-cg)**2*0.59+(b-cb)**2*0.11;
+    if(dist<nd){nd=dist;nearest=c.n}
+  }
+  return nearest;
+}
 function guessColor(cx,w,h){
   try{
-    const x0=Math.round(w*0.2), y0=Math.round(h*0.2);
-    const cw=Math.max(1,Math.round(w*0.6)), ch=Math.max(1,Math.round(h*0.6));
-    const d=cx.getImageData(x0,y0,cw,ch).data;
-    const buckets=new Map();
-    for(let i=0;i<d.length;i+=16){          // 4pxおき
-      const r=d[i],g=d[i+1],b=d[i+2];
-      const k=(r>>4)*256+(g>>4)*16+(b>>4);
-      const e=buckets.get(k)||[0,0,0,0];
-      e[0]+=r;e[1]+=g;e[2]+=b;e[3]++; buckets.set(k,e);
-    }
-    let best=null,bc=0;
-    for(const e of buckets.values()){ if(e[3]>bc){bc=e[3];best=e} }
-    if(!best) return null;
-    const r=best[0]/best[3], g=best[1]/best[3], b=best[2]/best[3];
-    let nearest=null,nd=1e9;
-    for(const c of COLORS){
-      if(c.n==='柄物') continue;
-      const cr=parseInt(c.hex.slice(1,3),16), cg=parseInt(c.hex.slice(3,5),16), cb=parseInt(c.hex.slice(5,7),16);
-      const dist=(r-cr)**2*0.3+(g-cg)**2*0.59+(b-cb)**2*0.11;
-      if(dist<nd){nd=dist;nearest=c.n}
-    }
-    return nearest;
+    const bg=sampleEdge(cx,w,h);
+    // まず背景を除いて集計。服が画面いっぱいで何も残らなければ除外なしで再集計
+    const rgb=tallyCenter(cx,w,h,bg)||tallyCenter(cx,w,h,null);
+    return rgb?nearestColorName(rgb):null;
   }catch(e){ return null }
 }
 
@@ -698,7 +739,7 @@ function renderToday(){
   // メンバーフィルタ（今日の記録用）
   if(!S._todayMem) S._todayMem=S.members[0].id;
   $('#today-mem').innerHTML=S.members.map(m=>
-    `<button class="chip" data-tmem="${m.id}" aria-pressed="${S._todayMem===m.id}">${esc(m.name)}</button>`).join('');
+    `<button class="chip" data-tmem="${m.id}" aria-pressed="${S._todayMem===m.id}"><span class="mdot" style="background:${memberHex(m)}"></span>${esc(m.name)}</button>`).join('');
   drawTodayGrid();
 }
 async function drawTodayGrid(){
@@ -724,7 +765,7 @@ function renderCloset(){
 
   $('#f-member').innerHTML=
     `<button class="chip" data-fm="all" aria-pressed="${S.fMember==='all'}">全員</button>`+
-    S.members.map(m=>`<button class="chip" data-fm="${m.id}" aria-pressed="${S.fMember===m.id}">${esc(m.name)}</button>`).join('');
+    S.members.map(m=>`<button class="chip" data-fm="${m.id}" aria-pressed="${S.fMember===m.id}"><span class="mdot" style="background:${memberHex(m)}"></span>${esc(m.name)}</button>`).join('');
   $('#f-cat').innerHTML=
     `<button class="chip" data-fc="all" aria-pressed="${S.fCat==='all'}">すべて</button>`+
     CATS.map(c=>`<button class="chip" data-fc="${c.id}" aria-pressed="${S.fCat===c.id}">${c.g} ${c.n}</button>`).join('');
@@ -790,7 +831,7 @@ function renderAdd(){
 
     <label class="f">だれの服</label>
     <div class="chips" id="d-mem">${S.members.map(m=>
-      `<button class="chip" data-dmem="${m.id}" aria-pressed="${mid===m.id}">${esc(m.name)}</button>`).join('')}</div>
+      `<button class="chip" data-dmem="${m.id}" aria-pressed="${mid===m.id}"><span class="mdot" style="background:${memberHex(m)}"></span>${esc(m.name)}</button>`).join('')}</div>
 
     <label class="f">カテゴリ</label>
     <div class="catgrid" id="d-cat">${CATS.map(c=>
@@ -800,7 +841,7 @@ function renderAdd(){
     <div class="chips" id="d-size">${sizes.map(s=>
       `<button class="chip" data-dsize="${s}" aria-pressed="${(d?.size??mem?.currentSize)===s}">${s}</button>`).join('')}</div>
 
-    <label class="f">色${d?.autoColor?' <span style="font-weight:400">（写真から推定）</span>':''}</label>
+    <label class="f">色${d?.autoColor?' <span style="font-weight:400;color:var(--indigo)">写真から判別しました。違っていればタップで変更</span>':''}</label>
     <div class="chips" id="d-color">${COLORS.map(c=>
       `<button class="chip" data-dcolor="${c.n}" aria-pressed="${d?.color===c.n}"><span class="sw" style="background:${c.hex}"></span>${c.n}</button>`).join('')}</div>
 
@@ -882,7 +923,7 @@ function renderSet(){
       const info=gi?`${gi.nowH.toFixed(0)}cm・${fitSize(gi.nowH)}サイズ・`
                    :(m.currentSize?'現在 '+esc(m.currentSize)+'・':'');
       return `<button class="row" data-member="${m.id}" style="width:100%;text-align:left">
-        <span class="th">${a!==null&&a<=14?'🧒':'🧑'}</span>
+        <span class="th av" style="background:${memberHex(m)}">${esc((m.name||'?').slice(0,1))}</span>
         <span class="body"><b>${esc(m.name)}</b>
         <span>${a!==null?a+'歳・':''}${info}${n}着</span></span>
       </button>`}).join('');
@@ -1003,6 +1044,12 @@ function openMemberForm(id){
      <button data-delheight="${r.id}">削除</button></div>`).join('')}</div>`:''}
   ${g?`<div class="tiny muted" style="margin-top:10px">現在の推定身長 ${g.nowH.toFixed(1)}cm ／ 年 ${g.rate.toFixed(1)}cm ペース（${g.source}）／ 適正サイズ ${fitSize(g.nowH)}cm</div>`:''}
 
+  <label class="f">アイコンの色</label>
+  <div class="chips" id="m-color">
+    ${MEMBER_COLORS.map(c=>
+      `<button class="chip" data-mcolor="${c.n}" aria-pressed="${(m?.color||'')===c.n}"><span class="sw" style="background:${c.hex}"></span>${c.n}</button>`).join('')}
+  </div>
+
   <label class="f">今のサイズ（身長を記録していない場合の代わり）</label>
   <div class="chips" id="m-size">
     ${KID_SIZES.concat(ADULT_SIZES).map(s=>
@@ -1015,6 +1062,7 @@ function openMemberForm(id){
   <div class="sp"></div>`);
   if(m?.currentSize) S._msize=String(m.currentSize);
   else S._msize=null;
+  S._mcolor=m?.color||null;
   S._mopen=m?.id||null;
 }
 
@@ -1154,13 +1202,13 @@ async function importData(file){
    イベント
    ============================================================ */
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
   if(g('data-tab')) return go(g('data-tab'));
   if(g('data-go'))  return go(g('data-go'));
-  if(g('data-close')) return closeSheet();
+  if(t.hasAttribute('data-close')) return closeSheet();
 
   if(g('data-fm')){ S.fMember=g('data-fm'); return renderCloset() }
   if(g('data-fc')){ S.fCat=g('data-fc');   return renderCloset() }
@@ -1193,6 +1241,12 @@ document.addEventListener('click',async e=>{
       b.setAttribute('aria-pressed', b.getAttribute('data-msize')===S._msize));
     return;
   }
+  if(g('data-mcolor')){
+    S._mcolor=g('data-mcolor');
+    $('#m-color').querySelectorAll('[data-mcolor]').forEach(b=>
+      b.setAttribute('aria-pressed', b.getAttribute('data-mcolor')===S._mcolor));
+    return;
+  }
   if(g('data-savemember')!==null&&t.hasAttribute('data-savemember')){
     const id=g('data-savemember')||uid();
     const name=($('#m-name').value||'').trim();
@@ -1200,6 +1254,7 @@ document.addEventListener('click',async e=>{
     const exist=memberOf(id);
     await dbPut('members',{id,name,birthday:$('#m-bd').value||null,
       currentSize:S._msize||exist?.currentSize||null,
+      color:S._mcolor||exist?.color||MEMBER_COLORS[S.members.length%MEMBER_COLORS.length].n,
       order:exist?.order??S.members.length});
     const hv=parseFloat($('#m-height')?.value);
     const hd=$('#m-hdate')?.value||today();
