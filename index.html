@@ -237,6 +237,31 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 .fc-row em.amber{color:var(--amber)}
 .fc-row em.indigo{color:var(--ink2);font-weight:500}
 .airow{display:flex;align-items:center;gap:12px;margin-top:12px}
+.tile .owner{position:absolute;left:6px;top:6px;width:26px;height:26px;border-radius:13px;
+  color:#fff;font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 0 2px var(--surface)}
+.tile .qty{position:absolute;right:6px;bottom:6px;padding:3px 8px;border-radius:7px;
+  background:var(--indigo);color:#fff;font-size:11.5px;font-weight:700}
+.chip.more{border-style:dashed;color:var(--indigo)}
+.sizes-more{margin-top:9px}
+.chip.onfilter{background:var(--indigo-bg);border-color:var(--indigo);color:var(--indigo-d);margin:2px 0 6px}
+.fc-card .fc-head b{display:flex;align-items:center}
+.fc-card .fc-head .mdot{display:inline-block;width:11px;height:11px;border-radius:6px;margin-right:8px;flex:0 0 auto}
+.fc-go{width:100%;text-align:left;border-top:1px solid var(--line2);min-height:50px}
+.fc-go .chev{font-style:normal;color:var(--ink3);font-size:20px;margin-left:2px}
+.qtyctl{display:inline-flex;align-items:center;gap:10px}
+.qtyctl button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);
+  background:var(--surface2);font-size:18px;font-weight:700;color:var(--ink)}
+.dupbox{margin-top:14px;padding:12px;border-radius:14px;background:var(--amber-bg)}
+.dupq{font-size:14px;font-weight:700;color:var(--amber);margin-bottom:10px}
+.duprow{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.duppair{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 12px}
+.duppair figure{margin:0}
+.duppair img,.duppair .ph{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;
+  border:1px solid var(--line);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:40px}
+.duppair figcaption{font-size:12px;color:var(--ink2);text-align:center;margin-top:5px}
+.act.col{flex-direction:column}
+.act.col .btn{min-width:0}
 .airow .btn{flex:0 0 auto}
 .row .th.av{color:#fff;font-size:20px;font-weight:700;border:none;line-height:1}
 .chip .mdot{display:inline-block;width:11px;height:11px;border-radius:6px;margin-right:8px;flex:0 0 auto}
@@ -268,6 +293,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
     <header class="top"><h1>クローゼット</h1><span class="sub" id="closet-count"></span></header>
     <div class="filters" id="f-member"></div>
     <div class="filters" id="f-cat"></div>
+    <div id="f-size"></div>
     <div id="closet-body"></div>
   </section>
 
@@ -285,7 +311,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 
   <!-- ===== 設定 ===== -->
   <section class="view" id="v-set">
-    <header class="top"><h1>設定</h1><span class="sub">v0.4</span></header>
+    <header class="top"><h1>設定</h1><span class="sub" id="ver"></span></header>
     <div id="set-body"></div>
   </section>
 
@@ -342,8 +368,23 @@ const MEMBER_COLORS = [
   {n:'レッド',  hex:'#B84B42'}, {n:'グレー',  hex:'#6B7B82'}
 ];
 const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
-const KID_SIZES = [80,90,100,110,120,130,140,150,160];
-const ADULT_SIZES = ['XS','S','M','L','XL','XXL','F'];
+const APP_VERSION = '0.5.0';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
+const KID_SIZES = ['60','70','80','90','100','110','120','130','140','150','160'];
+const ADULT_SIZES = ['XS','S','M','L','XL','XXL'];
+const FREE_SIZE = 'F';         // フリーサイズ。数字ではないのでサイズアウト判定の対象外
+const sizeLabel = s => String(s)===FREE_SIZE ? 'フリー' : String(s);
+/* サイズの選択肢。本人に合う系統を先に出し、もう一方は「他のサイズ」で開く */
+function sizeChips(id, attr, selected, kid){
+  const sel = selected==null ? '' : String(selected);
+  const main = kid ? KID_SIZES : ADULT_SIZES;
+  const other= kid ? ADULT_SIZES : KID_SIZES;
+  S._sizeMore = S._sizeMore || {};
+  const open = S._sizeMore[id] || other.includes(sel);
+  const chip = v => `<button class="chip" ${attr}="${v}" aria-pressed="${sel===String(v)}">${sizeLabel(v)}</button>`;
+  return `<div class="chips" id="${id}">${main.map(chip).join('')}${chip(FREE_SIZE)}
+      <button class="chip more" data-sizemore="${id}">${open?'閉じる':'他のサイズ'}</button></div>
+    <div class="chips sizes-more" id="${id}-more" ${open?'':'hidden'}>${other.map(chip).join('')}</div>`;
+}
 const API_BASE = 'https://kazokuro-api.ishimonzukan.workers.dev';  // AI判別を中継するWorker
 const STALE_DAYS = 120;      // これ以上着ていなければ「眠っている服」
 const MERCARI_MIN = 300;
@@ -424,7 +465,7 @@ async function repairPhotoLinks(){
 const S = {
   members:[], items:[], wears:[], growth:[],
   view:'today',
-  fMember:'all', fCat:'all',
+  fMember:'all', fCat:'all', fSize:null,
   draft:null,          // 登録中の1着
   lastUsed:{memberId:null,category:null},
   settings:{normalize:true, aiMode:'button', aiFreeLimit:30, plan:'free'},
@@ -765,6 +806,100 @@ function outgrowForecast(m){
     .sort((a,b)=>a.months-b.months);
   return {g,age,rows};
 }
+/* 子どもとして扱うか。生年月日がなくても、身長か数字のサイズがあれば子どもとみなす */
+function isKidMember(m){
+  const a=ageOf(m);
+  if(a!==null) return a<=15;
+  return heightsOf(m.id).length>0 || sizeNum(m.currentSize)!==null;
+}
+/* 予測カード。予測できないときも黙って消さず、何が足りないかを出す */
+function forecastCard(m){
+  const age=ageOf(m);
+  const head=`<div class="fc-head"><b><span class="mdot" style="background:${memberHex(m)}"></span>${esc(m.name)}</b>`;
+  const ask=msg=>`<button class="note amber" data-member="${m.id}" style="display:block;width:100%;text-align:left;margin-top:6px">${msg}</button>`;
+  if(age===null){
+    return `<div class="card fc-card">${head}<span>生年月日が未登録</span></div>
+      ${ask('生年月日を入れると予測できます。タップして入力')}</div>`;
+  }
+  const g=growthInfo(m);
+  if(!g){
+    return `<div class="card fc-card">${head}<span>${age}歳・身長が未記録</span></div>
+      ${ask('身長を記録すると、持っている服があと何ヶ月着られるか出ます。タップして入力')}</div>`;
+  }
+  const f=outgrowForecast(m);
+  const sized=S.items.filter(i=>i.memberId===m.id&&isActive(i)&&sizeNum(i.size)!==null).length;
+  let body;
+  if(f&&f.rows.length){
+    body=f.rows.map(r=>`<button class="fc-row fc-go" data-fcgo="${m.id}|${r.size}">
+        <b class="num">${r.size}cm</b><span class="num">${r.count}着</span>
+        <em class="${r.months<=3?'amber':'indigo'}">${monthsLabel(r.months)}</em><i class="chev">›</i></button>`).join('');
+  }else if(!sized){
+    body=`<div class="tiny muted" style="padding:10px 0">サイズが数字の服がまだ登録されていません。</div>`;
+  }else{
+    body=`<div class="tiny muted" style="padding:10px 0">1年半以内にサイズアウトする服はありません。</div>`;
+  }
+  return `<div class="card fc-card">${head}<span>${age}歳・推定 ${g.nowH.toFixed(0)}cm・年 ${g.rate.toFixed(1)}cm（${g.source}）</span></div>
+    ${body}
+    <div class="tiny muted" style="margin-top:10px">今ちょうど良いのは ${fitSize(g.nowH)}cm です。${g.source==='平均'?'身長を2回以上記録すると、この子の実際のペースで計算します。':''}</div>
+  </div>`;
+}
+
+/* ---- 重複の検出 ------------------------------------------ */
+/* 見た目の指紋。12x12の色つき縮小画像を4bitで持つ。
+   背景が白に揃っているので、白い部分同士は差ゼロとして素直に一致する。
+   （隣の画素との明暗を比べる dHash は、平坦な背景でノイズに振り回されるので使わない） */
+async function photoSig(blob){
+  try{
+    const bmp=await loadBitmap(blob);
+    const mid=document.createElement('canvas'); mid.width=96; mid.height=96;   // 一度に縮めると間引きになるので2段階
+    const mx=mid.getContext('2d'); mx.imageSmoothingEnabled=true; mx.imageSmoothingQuality='high';
+    mx.drawImage(bmp,0,0,96,96);
+    if(bmp.close) bmp.close();
+    const N=12, cv=document.createElement('canvas'); cv.width=N; cv.height=N;
+    const cx=cv.getContext('2d',{willReadFrequently:true});
+    cx.imageSmoothingEnabled=true; cx.imageSmoothingQuality='high';
+    cx.drawImage(mid,0,0,N,N);
+    const d=cx.getImageData(0,0,N,N).data;
+    let hex='';
+    for(let i=0;i<d.length;i+=4) hex+=(d[i]>>4).toString(16)+(d[i+1]>>4).toString(16)+(d[i+2]>>4).toString(16);
+    return hex;
+  }catch(e){ return null }
+}
+/* 0（同一）〜15（真逆）。検証では同じ服の撮り直しが0.5前後、形も色も同じ別の服が0.9前後 */
+function sigDist(a,b){
+  if(!a||!b||a.length!==b.length) return 99;
+  let t=0;
+  for(let i=0;i<a.length;i++) t+=Math.abs(parseInt(a[i],16)-parseInt(b[i],16));
+  return t/a.length;
+}
+const DUP_THRESHOLD = 0.9;  // これ以下を「同じ服かもしれない」とみなす。実データで調整する
+function dupCandidates(d){
+  if(!d?.sig) return [];
+  const skip=new Set(d.dupDismissed||[]);
+  return S.items
+    .filter(i=>isActive(i)&&i.sig&&!skip.has(i.id))
+    .filter(i=>!d.category||!i.category||i.category===d.category)
+    .map(i=>({i, dist: sigDist(d.sig,i.sig) - (d.memberId&&i.memberId===d.memberId ? 0.05 : 0)}))
+    .filter(x=>x.dist<=DUP_THRESHOLD)
+    .sort((a,b)=>a.dist-b.dist)
+    .slice(0,3)
+    .map(x=>x.i);
+}
+async function backfillHashes(){
+  for(const it of S.items){
+    if(it.sig||!it.photoId) continue;
+    const p=await dbGet('photos',it.photoId);
+    if(!p) continue;
+    const h=await photoSig(p.blob);
+    if(h){ it.sig=h; await dbPut('items',it) }
+  }
+}
+function ownerBadge(it){
+  if(S.fMember!=='all') return '';
+  const m=memberOf(it.memberId); if(!m) return '';
+  return `<span class="owner" style="background:${memberHex(m)}">${esc((m.name||'?').slice(0,1))}</span>`;
+}
+function qtyBadge(it){ return (it.qty||1)>1 ? `<span class="qty">×${it.qty}</span>` : '' }
 /* メルカリ想定価格（目安） */
 function estPrice(it){
   const p=Number(it.price);
@@ -879,10 +1014,13 @@ function renderToday(){
   h+=`<div class="card tiny muted">タップするだけで着用回数と最終着用日が更新されます。ここが貯まると「着ていない服」が正確に出ます。</div>`;
   h+=`<div class="filters" id="today-mem"></div><div class="grid" id="today-grid"></div>`;
 
-  // サイズアウト予測
-  const kids=S.members.filter(m=>{const a=ageOf(m); return a!==null&&a<=15});
-  const noHeight=kids.filter(m=>!heightsOf(m.id).length);
-  const fc=kids.map(m=>({m,f:outgrowForecast(m)})).filter(x=>x.f&&x.f.rows.length);
+  // サイズアウト予測：子どもは全員カードを出し、出せないときは理由を書く
+  const kids=S.members.filter(isKidMember);
+  if(kids.length){
+    h+=`<h2 class="sec">サイズアウト予測</h2>`;
+    h+=kids.map(forecastCard).join('');
+  }
+  const fc=[], noHeight=[];
 
   if(fc.length){
     h+=`<h2 class="sec">サイズアウト予測</h2>`;
@@ -946,6 +1084,9 @@ function renderCloset(){
   let list=act;
   if(S.fMember!=='all') list=list.filter(i=>i.memberId===S.fMember);
   if(S.fCat!=='all')    list=list.filter(i=>i.category===S.fCat);
+  if(S.fSize!=null)     list=list.filter(i=>sizeNum(i.size)===S.fSize);
+  $('#f-size').innerHTML = S.fSize!=null
+    ? `<button class="chip onfilter" data-fsizeclear>${S.fSize}cm だけを表示中　✕</button>` : '';
   list.sort((a,b)=>(b.addedAt||'').localeCompare(a.addedAt||''));
 
   if(!list.length){
@@ -959,7 +1100,7 @@ function renderCloset(){
       const flag=isOutgrown(it)?'<span class="flag amber"></span>':'';
       return `<button class="tile" data-item="${it.id}">
         <div class="ph" data-photo="${it.photoId||''}" style="${fadeStyle(it)}">${catOf(it.category).g}</div>
-        ${flag}<span class="tag">${d===null?'未着用':d===0?'今日':d+'日前'}</span>
+        ${flag}${ownerBadge(it)}${qtyBadge(it)}<span class="tag">${d===null?'未着用':d===0?'今日':d+'日前'}</span>
       </button>`}).join('')+`</div>
     <div class="legend">
       <span>色が薄い＝しばらく着ていない服</span>
@@ -1014,6 +1155,14 @@ function renderAdd(){
       ${d.aiError==='limit'?'<div class="note amber tiny">今月の無料回数を使い切りました。設定から切り替えるか、来月まで手動で入力してください。</div>':
         d.aiError?`<div class="note amber tiny">判別できませんでした：${esc(d.aiError)}</div>`:''}
     `:''}
+    ${(()=>{
+      const dups=d?.photoURL?dupCandidates({...d,memberId:mid}):[];
+      return dups.length?`<div class="dupbox">
+        <div class="dupq">似た服がすでに登録されています。これですか？</div>
+        <div class="duprow">${dups.map(i=>`<button class="tile" data-dup="${i.id}">
+          <div class="ph" data-photo="${i.photoId||''}">${catOf(i.category).g}</div>${qtyBadge(i)}</button>`).join('')}</div>
+      </div>`:'';
+    })()}
 
     <label class="f">だれの服</label>
     <div class="chips" id="d-mem">${S.members.map(m=>
@@ -1024,8 +1173,7 @@ function renderAdd(){
       `<button data-dcat="${c.id}" aria-pressed="${cat===c.id}"><span class="g">${c.g}</span>${c.n}</button>`).join('')}</div>
 
     <label class="f">サイズ</label>
-    <div class="chips" id="d-size">${sizes.map(s=>
-      `<button class="chip" data-dsize="${s}" aria-pressed="${(d?.size??mem?.currentSize)===s}">${s}</button>`).join('')}</div>
+    ${sizeChips('d-size','data-dsize',d?.size??mem?.currentSize,kid)}
 
     <label class="f">色${d?.autoColor?' <span style="font-weight:400;color:var(--indigo)">写真から判別しました。違っていればタップで変更</span>':''}</label>
     <div class="chips" id="d-color">${COLORS.map(c=>
@@ -1049,6 +1197,26 @@ function renderAdd(){
     <button class="btn sub" id="save-next">保存して次へ</button>
     <button class="btn" id="save-done">保存する</button>
   </div>`;
+  hydratePhotos($('#add-body .duprow'));
+}
+
+async function openDup(id){
+  const it=S.items.find(i=>i.id===id); if(!it) return;
+  const u=await photoURL(it.photoId);
+  const m=memberOf(it.memberId);
+  openSheet(`
+  <div class="shead"><h3>この服ですか？</h3><button class="x" data-close>閉じる</button></div>
+  <div class="duppair">
+    <figure><img src="${S.draft?.photoURL||''}" alt=""><figcaption>今撮った写真</figcaption></figure>
+    <figure>${u?`<img src="${u}" alt="">`:`<div class="ph">${catOf(it.category).g}</div>`}<figcaption>登録済み</figcaption></figure>
+  </div>
+  <p class="tiny muted" style="margin:0 0 6px">${esc(m?m.name:'')}・${esc([catOf(it.category).n,it.size?sizeLabel(it.size):'',it.color].filter(Boolean).join(' '))}・今 ${it.qty||1}枚</p>
+  <div class="act col">
+    <button class="btn wide" data-dupact="${id}|same">同じ服です（登録しない）</button>
+    <button class="btn sub wide" data-dupact="${id}|more">同じ服をもう1枚持っている</button>
+    <button class="btn ghost wide" data-dupact="${id}|diff">別の服です</button>
+  </div>
+  <div class="sp"></div>`);
 }
 
 /* ---------- 手放す ---------- */
@@ -1150,7 +1318,7 @@ function renderSet(){
   </div>`;
 
   h+=`<h2 class="sec">このアプリについて</h2><div class="card tiny muted">
-    家族ローゼット（かぞクロ）v0.4<br>
+    家族ローゼット（かぞクロ）v${APP_VERSION}<br>
     子どものサイズアウトを、手遅れになる前に教えるアプリです。<br><br>
     身長の記録が2回以上あると、その子の実際の成長ペースで予測します。<br>
     コーデ提案は、服のデータが貯まってから追加する予定です。
@@ -1190,6 +1358,7 @@ async function openItem(id){
     <dt>色</dt><dd>${esc(it.color||'—')}</dd>
     <dt>ブランド</dt><dd>${esc(it.brand||'—')}</dd>
     <dt>シーズン</dt><dd>${(it.season||[]).join('・')||'—'}</dd>
+    <dt>持っている枚数</dt><dd><span class="qtyctl"><button data-qty="${it.id}|-1" aria-label="減らす">−</button><b>${it.qty||1}枚</b><button data-qty="${it.id}|1" aria-label="増やす">＋</button></span></dd>
     <dt>着用回数</dt><dd>${it.wearCount||0}回</dd>
     <dt>最後に着た日</dt><dd>${d===null?'まだ着ていません':(d===0?'今日':d+'日前')}</dd>
     <dt>購入価格</dt><dd>${yen(it.price)}</dd>
@@ -1290,8 +1459,7 @@ function openEdit(id){
   <div class="catgrid" id="e-cat">${CATS.map(c=>
     `<button data-ecat="${c.id}" aria-pressed="${it.category===c.id}"><span class="g">${c.g}</span>${c.n}</button>`).join('')}</div>
   <label class="f">サイズ</label>
-  <div class="chips" id="e-size">${sizes.map(s=>
-    `<button class="chip" data-esize="${s}" aria-pressed="${String(it.size)===String(s)}">${s}</button>`).join('')}</div>
+  ${sizeChips('e-size','data-esize',it.size,kid)}
   <label class="f">色</label>
   <div class="chips" id="e-color">${COLORS.map(c=>
     `<button class="chip" data-ecolor="${c.n}" aria-pressed="${it.color===c.n}"><span class="sw" style="background:${c.hex}"></span>${c.n}</button>`).join('')}</div>
@@ -1359,6 +1527,7 @@ async function saveDraft(keepGoing){
     purchaseDate:d.purchaseDate||null,
     season:d.season||[], status:'active',
     pattern:d.pattern||null, hasCharacterPrint:!!d.hasCharacterPrint,
+    sig:d.sig||null, qty:1,
     wearCount:0, lastWorn:null, addedAt:today()
   };
   await dbPut('items',it);
@@ -1514,8 +1683,9 @@ async function acceptPhoto(source){
   if(lab) lab.innerHTML='<span class="g">⏳</span><span>仕上げています…</span>';
   try{
     const {blob,color}=await processPhoto(source);
+    const sig=await photoSig(blob);
     if(S.draft?.photoURL) URL.revokeObjectURL(S.draft.photoURL);
-    S.draft={...(S.draft||{}),blob,photoURL:URL.createObjectURL(blob),
+    S.draft={...(S.draft||{}),blob,sig,dupDismissed:[],photoURL:URL.createObjectURL(blob),
       color:S.draft?.autoColor===false?S.draft.color:(color||S.draft?.color),
       autoColor:S.draft?.autoColor===false?false:!!color,
       aiDone:false,aiError:null,pattern:null,hasCharacterPrint:false};
@@ -1524,15 +1694,52 @@ async function acceptPhoto(source){
   if(S.settings.aiMode==='auto' && S.draft?.blob) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#toggle-norm,#ai-run,#save-api,#toggle-plan,[data-aimode]');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#toggle-norm,#ai-run,#save-api,#toggle-plan,[data-aimode]');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
-  if(g('data-tab')) return go(g('data-tab'));
+  if(g('data-tab')){ if(g('data-tab')==='closet') S.fSize=null; return go(g('data-tab')) }
   if(g('data-go'))  return go(g('data-go'));
   if(t.hasAttribute('data-close')) return closeSheet();
 
-  if(g('data-fm')){ S.fMember=g('data-fm'); return renderCloset() }
+  if(g('data-fcgo')){
+    const [mid,size]=g('data-fcgo').split('|');
+    S.fMember=mid; S.fCat='all'; S.fSize=Number(size);
+    return go('closet');
+  }
+  if(t.hasAttribute('data-fsizeclear')){ S.fSize=null; return renderCloset() }
+  if(g('data-sizemore')){
+    const id=g('data-sizemore'), box=document.getElementById(id+'-more');
+    if(!box) return;
+    box.hidden=!box.hidden;
+    S._sizeMore=S._sizeMore||{}; S._sizeMore[id]=!box.hidden;
+    t.textContent=box.hidden?'他のサイズ':'閉じる';
+    return;
+  }
+  if(g('data-dup')) return openDup(g('data-dup'));
+  if(g('data-dupact')){
+    const [id,act]=g('data-dupact').split('|');
+    const it=S.items.find(i=>i.id===id);
+    if(act==='diff'){
+      S.draft={...S.draft,dupDismissed:[...(S.draft?.dupDismissed||[]),id]};
+      closeSheet(); return renderAdd();
+    }
+    if(it&&act==='more'){ it.qty=(it.qty||1)+1; await dbPut('items',it) }
+    if(S.draft?.photoURL) URL.revokeObjectURL(S.draft.photoURL);
+    S.draft=S.draft?{memberId:S.draft.memberId,category:S.draft.category,size:S.draft.size,season:S.draft.season}:null;
+    await reload(); closeSheet(); renderAdd();
+    toast(act==='more'&&it?`${it.qty}枚にしました`:'登録しませんでした');
+    return;
+  }
+  if(g('data-qty')){
+    const [id,dv]=g('data-qty').split('|');
+    const it=S.items.find(i=>i.id===id); if(!it) return;
+    it.qty=Math.max(1,(it.qty||1)+Number(dv));
+    await dbPut('items',it); await reload(); render();
+    return openItem(id);
+  }
+
+  if(g('data-fm')){ S.fMember=g('data-fm'); S.fSize=null; return renderCloset() }
   if(g('data-fc')){ S.fCat=g('data-fc');   return renderCloset() }
   if(g('data-tmem')){ S._todayMem=g('data-tmem'); return renderToday() }
 
@@ -1636,7 +1843,7 @@ document.addEventListener('click',async e=>{
       const key={'e-mem':'memberId','e-cat':'category','e-size':'size','e-color':'color'}[grp];
       const attr={'e-mem':'data-emem','e-cat':'data-ecat','e-size':'data-esize','e-color':'data-ecolor'}[grp];
       S._edit[key]=t.getAttribute(attr);
-      $('#'+grp).querySelectorAll('['+attr+']').forEach(b=>
+      document.querySelectorAll('#sheet-inner ['+attr+']').forEach(b=>
         b.setAttribute('aria-pressed', b.getAttribute(attr)===S._edit[key]));
     }
     return;
@@ -1716,7 +1923,9 @@ document.addEventListener('change',async e=>{
     await openDB();
     await reload();
     const fixed=await repairPhotoLinks();
+    const ver=$('#ver'); if(ver) ver.textContent='v'+APP_VERSION;
     go('today');
+    backfillHashes();
     if(fixed) setTimeout(()=>toast(fixed+'着の写真を復旧しました'),600);
   }catch(e){
     document.getElementById('app').innerHTML=
