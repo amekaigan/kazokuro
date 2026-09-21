@@ -243,7 +243,17 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .tile .qty{position:absolute;right:6px;bottom:6px;padding:3px 8px;border-radius:7px;
   background:var(--indigo);color:#fff;font-size:calc(11.5px*var(--fs,1));font-weight:700}
 .chip.more{border-style:dashed;color:var(--indigo)}
-.sizes-more{margin-top:9px}
+.sizes-more{margin-top:8px}
+/* hidden 属性を必ず効かせる（.chips や .act の display 指定に負けて表示されていた） */
+[hidden]{display:none!important}
+/* 格子に並べる（サイズ5列・色とシーズン4列）。カテゴリと同じ角丸の四角 */
+.chips.g5,.chips.g4{display:grid;gap:8px}
+.chips.g5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.chips.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.chips.g5 .chip,.chips.g4 .chip{justify-content:center;padding:0 2px;min-height:46px;border-radius:12px;white-space:nowrap}
+.chips.g5 .chip.more{grid-column:1/-1}
+.chips.cgrid .chip{flex-direction:column;gap:5px;min-height:62px;font-size:calc(13px*var(--fs,1))}
+.chips.cgrid .chip .sw{margin-right:0;width:20px;height:20px;border-radius:6px}
 .chip.onfilter{background:var(--indigo-bg);border-color:var(--indigo);color:var(--indigo-d);margin:2px 0 6px}
 .fc-card .fc-head b{display:flex;align-items:center}
 .fc-card .fc-head .mdot{display:inline-block;width:11px;height:11px;border-radius:6px;margin-right:8px;flex:0 0 auto}
@@ -406,7 +416,7 @@ const MEMBER_COLORS = [
   {n:'レッド',  hex:'#B84B42'}, {n:'グレー',  hex:'#6B7B82'}
 ];
 const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
-const APP_VERSION = '0.9.0';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
+const APP_VERSION = '0.9.1';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
 const KID_SIZES = ['60','70','80','90','100','110','120','130','140','150','160'];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL'];
 const FREE_SIZE = 'F';         // フリーサイズ。数字ではないのでサイズアウト判定の対象外
@@ -442,9 +452,9 @@ function sizeChips(id, attr, selected, kid, cat, m){
   }
   const open = S._sizeMore[id] || other.includes(sel);
   const chip = v => `<button class="chip" ${attr}="${v}" aria-pressed="${sel===String(v)}">${sizeLabel(v)}</button>`;
-  return `<div class="chips" id="${id}">${main.map(chip).join('')}${chip(FREE_SIZE)}
+  return `<div class="chips g5" id="${id}">${main.map(chip).join('')}${chip(FREE_SIZE)}
       <button class="chip more" data-sizemore="${id}" data-more="${more}">${open?'閉じる':'＋'+more}</button></div>
-    <div class="chips sizes-more" id="${id}-more" ${open?'':'hidden'}>${other.map(chip).join('')}</div>`;
+    <div class="chips g5 sizes-more" id="${id}-more" ${open?'':'hidden'}>${other.map(chip).join('')}</div>`;
 }
 const API_BASE = 'https://kazokuro-api.ishimonzukan.workers.dev';  // AI判別を中継するWorker
 const STALE_DAYS = 120;      // これ以上着ていなければ「眠っている服」
@@ -1645,11 +1655,11 @@ function renderAdd(){
     <div id="d-size-wrap">${sizeChips('d-size','data-dsize', d?.size ?? (cat==='shoes'?null:mem?.currentSize), kid, cat, mem)}</div>
 
     <label class="f">色${d?.autoColor?' <span style="font-weight:400;color:var(--indigo)">写真から判別しました。違っていればタップで変更</span>':''}</label>
-    <div class="chips" id="d-color">${COLORS.map(c=>
+    <div class="chips g4 cgrid" id="d-color">${COLORS.map(c=>
       `<button class="chip" data-dcolor="${c.n}" aria-pressed="${d?.color===c.n}"><span class="sw" style="background:${c.hex}"></span>${c.n}</button>`).join('')}</div>
 
     <label class="f">シーズン</label>
-    <div class="chips" id="d-season">${SEASONS.map(s=>
+    <div class="chips g4" id="d-season">${SEASONS.map(s=>
       `<button class="chip" data-dseason="${s}" aria-pressed="${(d?.season||[]).includes(s)}">${s}</button>`).join('')}</div>
 
     <label class="f" for="d-brand">ブランド（任意）</label>
@@ -1862,7 +1872,7 @@ async function openItem(id){
   openSheet(`
   <div class="shead"><h3>${esc([c.n,it.size?sizeLabel(it.size):''].filter(Boolean).join(' '))}</h3>
     <span class="shead-act"><button class="x" data-edit="${it.id}">編集</button><button class="x" data-close>閉じる</button></span></div>
-  ${u?`<img class="hero" src="${u}" alt="">`:`<div class="hero" style="display:flex;align-items:center;justify-content:center;font-size:calc(52px*var(--fs,1))">${c.g}</div>`}
+  ${u?`<img class="hero" src="${u}" alt="" decoding="sync">`:`<div class="hero" style="display:flex;align-items:center;justify-content:center;font-size:calc(52px*var(--fs,1))">${c.g}</div>`}
   <div class="agebar">${esc(ageLine(it))}</div>
   ${navBar}
 
@@ -1913,8 +1923,28 @@ async function openItem(id){
   </div>
   <div class="act"><button class="btn ghost wide" data-del="${it.id}" style="color:var(--danger)">この服を削除</button></div>
   <div class="sp"></div>`);
-  S._openItemId=it.id;
+ S._openItemId=it.id;
   hydratePhotos($('#sheet-inner'));
+  warmNeighbors();
+}
+/* 前後の服の写真を先に読み込んで展開しておく。スワイプした瞬間に写真が白く抜けないように */
+const warmed=new Map();
+function warmPhoto(photoId){
+  if(!photoId) return Promise.resolve();
+  if(warmed.has(photoId)) return warmed.get(photoId).p;
+  const p=photoURL(photoId).then(u=>{
+    if(!u) return;
+    const im=new Image(); im.src=u;
+    const rec=warmed.get(photoId); if(rec) rec.im=im;  // 展開済みの画像を手放さないよう持っておく
+    return im.decode ? im.decode().catch(()=>{}) : null;
+  });
+  warmed.set(photoId,{p,im:null});
+  while(warmed.size>4) warmed.delete(warmed.keys().next().value);
+  return p;
+}
+function warmNeighbors(){
+  const nav=S._nav||[], i=nav.indexOf(S._openItemId); if(i<0) return;
+  [nav[i+1],nav[i-1]].forEach(id=>{ const x=S.items.find(v=>v.id===id); if(x) warmPhoto(x.photoId) });
 }
 /* 前後の服へ。一覧で見えていた順番のとおりに進む */
 function stepItem(dir){
@@ -1922,19 +1952,25 @@ function stepItem(dir){
   if(i<0) return false;
   const j=i+dir;
   if(j<0||j>=nav.length){ toast(dir>0?'これが最後の服です':'これが最初の服です'); return false }
-  const inner=$('#sheet-inner');
-  inner.style.transition='transform .14s, opacity .14s';
-  inner.style.transform=`translateX(${dir>0?-60:60}px)`; inner.style.opacity='0';
-  setTimeout(async()=>{
-    await openItem(nav[j]);
+  if(S._stepping) return true;
+  S._stepping=true;
+  const inner=$('#sheet-inner'), w=inner.offsetWidth||360;
+  const next=S.items.find(v=>v.id===nav[j]);
+  const ready=warmPhoto(next&&next.photoId);         // 画面が動いている間に次の写真を用意する
+  inner.style.transition='transform .12s ease-in';
+  inner.style.transform=`translateX(${dir>0?-w:w}px)`;
+  const slid=new Promise(r=>setTimeout(r,120));
+  const capped=Promise.race([ready,new Promise(r=>setTimeout(r,300))]);
+  Promise.all([slid,capped]).then(async()=>{
+    try{ await openItem(nav[j]) }catch(e){}
     $('#sheet').scrollTop=0;
     inner.style.transition='none';
-    inner.style.transform=`translateX(${dir>0?60:-60}px)`;
+    inner.style.transform=`translateX(${dir>0?w*0.3:-w*0.3}px)`;
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      inner.style.transition='transform .18s, opacity .18s'; inner.style.transform=''; inner.style.opacity='';
-      setTimeout(()=>{ inner.style.transition='' },220);
+      inner.style.transition='transform .16s ease-out'; inner.style.transform='';
+      setTimeout(()=>{ inner.style.transition=''; S._stepping=false },180);
     }));
-  },140);
+  });
   if(!S.settings.swiped){ S.settings.swiped=true; saveSettings() }
   return true;
 }
@@ -1984,13 +2020,13 @@ function openMemberForm(id){
       : `身長 ${g.measured}cm（大人は成長予測の対象外です）`}</div>`:''}
 
   <label class="f">アイコンの色</label>
-  <div class="chips" id="m-color">
+  <div class="chips g4 cgrid" id="m-color">
     ${MEMBER_COLORS.map(c=>
       `<button class="chip" data-mcolor="${c.n}" aria-pressed="${(m?.color||'')===c.n}"><span class="sw" style="background:${c.hex}"></span>${c.n}</button>`).join('')}
   </div>
 
   <label class="f">今のサイズ（身長を記録していない場合の代わり）</label>
-  <div class="chips" id="m-size">
+  <div class="chips g5" id="m-size">
     ${KID_SIZES.concat(ADULT_SIZES).map(s=>
       `<button class="chip" data-msize="${s}" aria-pressed="${String(m?.currentSize||'')===String(s)}">${s}</button>`).join('')}
   </div>
@@ -2021,10 +2057,10 @@ function openEdit(id){
   <label class="f">サイズ</label>
   <div id="e-size-wrap">${sizeChips('e-size','data-esize',it.size,kid,it.category,mem)}</div>
   <label class="f">色</label>
-  <div class="chips" id="e-color">${COLORS.map(c=>
+  <div class="chips g4 cgrid" id="e-color">${COLORS.map(c=>
     `<button class="chip" data-ecolor="${c.n}" aria-pressed="${it.color===c.n}"><span class="sw" style="background:${c.hex}"></span>${c.n}</button>`).join('')}</div>
   <label class="f">シーズン</label>
-  <div class="chips" id="e-season">${SEASONS.map(s=>
+  <div class="chips g4" id="e-season">${SEASONS.map(s=>
     `<button class="chip" data-eseason="${s}" aria-pressed="${(it.season||[]).includes(s)}">${s}</button>`).join('')}</div>
   <label class="f" for="e-brand">ブランド</label>
   <input type="text" id="e-brand" value="${esc(it.brand||'')}">
@@ -2605,8 +2641,7 @@ document.addEventListener('focusout',e=>{ if(e.target&&e.target.id==='wear-date'
     if(!st.dir && (Math.abs(dx)>12||Math.abs(dy)>12)) st.dir = Math.abs(dx)>Math.abs(dy)*1.3 ? 'x' : 'y';
     if(st.dir==='y' && st.top && dy>0){ sh.style.transform=`translateY(${dy*0.6}px)`; e.preventDefault() }
     if(st.dir==='x' && !st.noX && S._openItemId){
-      inner.style.transform=`translateX(${dx*0.45}px)`;
-      inner.style.opacity=String(1-Math.min(.5,Math.abs(dx)/600));
+      inner.style.transform=`translateX(${dx}px)`;       // 指に吸いつかせる
     }
   },{passive:false});
   sh.addEventListener('touchend',e=>{
@@ -2614,7 +2649,7 @@ document.addEventListener('focusout',e=>{ if(e.target&&e.target.id==='wear-date'
     const t=e.changedTouches[0], dx=t.clientX-st.x, dy=t.clientY-st.y, dt=Date.now()-st.t;
     const s0=st; st=null;
     if(s0.dir==='y' && s0.top && dy>90){ closeSheet(); return }
-    if(s0.dir==='x' && !s0.noX && S._openItemId && (Math.abs(dx)>80 || (Math.abs(dx)>40&&dt<300))){
+    if(s0.dir==='x' && !s0.noX && S._openItemId && (Math.abs(dx)>60 || (Math.abs(dx)>30&&dt<300))){
       if(stepItem(dx<0?1:-1)) return;
     }
     sh.style.transition='transform .18s'; sh.style.transform='';
