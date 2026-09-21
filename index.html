@@ -265,6 +265,16 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 .datebar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 12px}
 .datebar .chip{padding:0 15px}
 .datechip,.datebtn{position:relative;overflow:hidden;cursor:pointer}
+.shead-act{display:flex;align-items:center;gap:2px}
+.hist .histph{width:44px;height:44px;flex:0 0 44px;border-radius:8px;overflow:hidden;padding:0;
+  border:1px solid var(--line);background:var(--surface2);display:flex;align-items:center;justify-content:center;
+  color:var(--ink3);font-size:16px;font-style:normal;min-width:0}
+.hist .histph img{width:100%;height:100%;object-fit:cover}
+.hist .histph.none{border-style:dashed;opacity:.45}
+.ptab{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:14px}
+.ptab th,.ptab td{padding:8px 4px;text-align:center;border-bottom:1px solid var(--line2)}
+.ptab tbody th{text-align:left;color:var(--ink2);font-weight:600}
+.ptab .cur{background:var(--indigo-bg);color:var(--indigo-d);font-weight:700}
 .homecard{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px 14px 14px;margin-top:2px}
 .homehead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
 .homehead b{font-size:20px;font-weight:700}
@@ -390,7 +400,7 @@ const MEMBER_COLORS = [
   {n:'レッド',  hex:'#B84B42'}, {n:'グレー',  hex:'#6B7B82'}
 ];
 const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
-const APP_VERSION = '0.7.0';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
+const APP_VERSION = '0.8.0';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
 const KID_SIZES = ['60','70','80','90','100','110','120','130','140','150','160'];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL'];
 const FREE_SIZE = 'F';         // フリーサイズ。数字ではないのでサイズアウト判定の対象外
@@ -420,7 +430,7 @@ const GROWTH_BY_AGE = [
 /* ============================================================
    IndexedDB
    ============================================================ */
-const DB_NAME='kazoku-closet', DB_VER=3;
+const DB_NAME='kazoku-closet', DB_VER=4;
 let db=null;
 
 function openDB(){
@@ -439,6 +449,7 @@ function openDB(){
       }
       if(!d.objectStoreNames.contains('photos')) d.createObjectStore('photos',{keyPath:'id'});
       if(!d.objectStoreNames.contains('thumbs')) d.createObjectStore('thumbs',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('outfits')) d.createObjectStore('outfits',{keyPath:'id'});
       if(!d.objectStoreNames.contains('growth')){
         const s=d.createObjectStore('growth',{keyPath:'id'});
         s.createIndex('memberId','memberId',{unique:false});
@@ -491,14 +502,16 @@ const S = {
   fMember:'all', fCat:'all', fSize:null,
   draft:null,          // 登録中の1着
   lastUsed:{memberId:null,category:null},
-  settings:{finish:'soft', aiMode:'button', aiFreeLimit:30, plan:'free'},
-  usage:{month:'', count:0}
+  settings:{finish:'soft', aiMode:'button', plan:'free'},
+  usage:{month:'', count:0},
+  packs:[], outfits:[]
 };
 try{
   const raw=localStorage.getItem('kazokuro-settings');
   if(raw) Object.assign(S.settings,JSON.parse(raw));
   const u=localStorage.getItem('kazokuro-usage');
   if(u) Object.assign(S.usage,JSON.parse(u));
+  S.packs=JSON.parse(localStorage.getItem('kazokuro-packs')||'[]');
 }catch(e){}
 function saveSettings(){
   try{ localStorage.setItem('kazokuro-settings',JSON.stringify(S.settings)) }catch(e){}
@@ -511,13 +524,55 @@ function usageNow(){
 function saveUsage(){
   try{ localStorage.setItem('kazokuro-usage',JSON.stringify(S.usage)) }catch(e){}
 }
-function aiUnlimited(){ return S.settings.plan!=='free' }
-function aiRemaining(){
-  if(aiUnlimited()) return Infinity;
-  return Math.max(0, S.settings.aiFreeLimit - usageNow().count);
+/* ---- プランと上限 ------------------------------------------
+   原価ゼロのもの（家族・服・写真の保存）と、原価がかかるもの（AI）を分けて上限を置く */
+const PLANS={
+  free:    {name:'無料',     members:6,  items:150, photoKeep:{days:30},   ai:30},
+  onetime: {name:'買い切り', members:8,  items:300, photoKeep:{count:300}, ai:30},
+  monthly: {name:'月額',     members:10, items:600, photoKeep:{count:999}, ai:200}
+};
+const PACK_SIZE=100, PACK_DAYS=180;
+function planKey(){ const k=S.settings.plan; return k==='unlimited' ? 'monthly' : (PLANS[k] ? k : 'free') }
+function plan(){ return PLANS[planKey()] }
+function keepLabel(p){ return p.photoKeep.days ? `直近${p.photoKeep.days}日` : `直近${p.photoKeep.count}枚` }
+function savePacks(){ try{ localStorage.setItem('kazokuro-packs',JSON.stringify(S.packs)) }catch(e){} }
+function livePacks(){ const now=Date.now(); return (S.packs||[]).filter(k=>k.remaining>0&&k.expires>now).sort((a,b)=>a.expires-b.expires) }
+function monthlyLeft(){ return Math.max(0, plan().ai - usageNow().count) }
+function packLeft(){ return livePacks().reduce((t,k)=>t+k.remaining,0) }
+function aiRemaining(){ return monthlyLeft()+packLeft() }
+function aiRemainLabel(){ const k=packLeft(); return `今月あと${monthlyLeft()}回`+(k?`＋パック${k}回`:'') }
+/* 毎月の枠を先に使い、なくなったら期限の近いパックから減らす */
+function consumeAi(){
+  if(monthlyLeft()>0){ const u=usageNow(); u.count++; saveUsage(); return }
+  const k=livePacks()[0]; if(k){ k.remaining--; savePacks() }
 }
-function aiRemainLabel(){
-  return aiUnlimited() ? '無制限' : `今月あと${aiRemaining()}回`;
+function countItems(){ return S.items.filter(i=>(i.status||'active')!=='sold').length }
+function canAddItem(){ return countItems() < plan().items }
+function canAddMember(){ return S.members.length < plan().members }
+function planTable(){
+  const ks=Object.keys(PLANS), cur=planKey();
+  const row=(n,f)=>`<tr><th>${n}</th>${ks.map(k=>`<td class="${k===cur?'cur':''}">${f(PLANS[k])}</td>`).join('')}</tr>`;
+  return `<table class="ptab"><thead><tr><th></th>${ks.map(k=>`<th class="${k===cur?'cur':''}">${PLANS[k].name}</th>`).join('')}</tr></thead><tbody>
+    ${row('家族',x=>x.members+'人')}${row('服',x=>x.items+'着')}${row('着た日の写真',x=>keepLabel(x))}${row('AI判別',x=>'月'+x.ai+'回')}${row('回数パック',()=>'購入可')}
+  </tbody></table>`;
+}
+/* 上限に当たったとき。止めるのは新しい追加だけで、今あるデータはそのまま見られる */
+function openLimit(kind){
+  const x=plan();
+  const msg={
+    items:`${x.name}プランで登録できる服は${x.items}着までです。`,
+    members:`${x.name}プランで登録できる家族は${x.members}人までです。`,
+    ai:`今月のAI判別（${x.ai}回）を使い切りました。`
+  }[kind];
+  openSheet(`
+    <div class="shead"><h3>上限に達しました</h3><button class="x" data-close>閉じる</button></div>
+    <div class="note amber">${msg}</div>
+    <p class="tiny muted" style="margin:12px 0 0">登録済みの服や記録は、このまますべて見られます。止まるのは新しい追加だけです。</p>
+    ${planTable()}
+    ${kind==='ai'?`<p class="tiny muted" style="margin:12px 0 0">回数パック（${PACK_SIZE}回・${PACK_DAYS}日有効）を足すと、今月の残りでも使えます。来月になれば毎月の回数は戻ります。</p>`:''}
+    <div class="act col">
+      <button class="btn wide" data-go="set" data-close>プランを見る</button>
+    </div><div class="sp"></div>`);
 }
 const urlCache=new Map();
 
@@ -559,11 +614,12 @@ async function thumbURL(id){
   return u;
 }
 async function reload(){
-  const [m,i,w,gr]=await Promise.all([dbAll('members'),dbAll('items'),dbAll('wears'),dbAll('growth')]);
+  const [m,i,w,gr,of]=await Promise.all([dbAll('members'),dbAll('items'),dbAll('wears'),dbAll('growth'),dbAll('outfits')]);
   S.members=m.sort((a,b)=>(a.order??0)-(b.order??0));
   S.items=i;
   S.wears=w;
   S.growth=gr;
+  S.outfits=of;
 }
 
 /* ============================================================
@@ -1010,6 +1066,15 @@ function dupCandidates(d){
     .slice(0,3)
     .map(x=>x.i);
 }
+/* ブラウザに「このデータは消さないで」と申請する */
+async function requestPersist(){
+  try{
+    if(!navigator.storage||!navigator.storage.persist){ S._persisted=false; return }
+    let ok=await navigator.storage.persisted();
+    if(!ok) ok=await navigator.storage.persist();
+    S._persisted=!!ok;
+  }catch(e){ S._persisted=false }
+}
 async function backfillHashes(){
   for(const it of S.items){
     if(it.sig||!it.photoId) continue;
@@ -1176,6 +1241,7 @@ function renderToday(){
         <input type="date" id="wear-date" value="${day}" max="${today()}" aria-label="日付を選ぶ"></label>
     </div>
     ${isToday?'':`<button class="note amber" data-wday="${today()}" style="display:block;width:100%;text-align:left;margin-bottom:10px">${esc(fmtMD(day))}の記録を編集中です。タップで今日に戻ります</button>`}
+    <div class="filters" id="today-cat"></div>
     <div class="grid" id="today-grid"></div>
     <div class="tiny muted center" style="margin-top:10px">服をタップで記録・もう一度タップで取り消し</div>
   </div>`;
@@ -1218,7 +1284,7 @@ async function outfitIdentify(file){
   const day=S.wearDate||today();
   const cands=S.items.filter(i=>isActive(i)&&i.memberId===mid);
   if(!cands.length){ toast(`${m?.name||''}さんの服がまだ登録されていません`); return }
-  if(aiRemaining()<=0){ toast('今月のAI判別を使い切りました'); return }
+  if(aiRemaining()<=0) return openLimit('ai');
 
   openSheet(`<div class="shead"><h3>写真から探しています</h3><button class="x" data-close>閉じる</button></div>
     <div class="empty"><span class="g">🔍</span><p>${esc(m.name)}さんの${cands.length}着の中から探しています…</p></div>`);
@@ -1239,7 +1305,7 @@ async function outfitIdentify(file){
     });
     const json=await res.json().catch(()=>null);
     if(!res.ok||!json?.ok) throw new Error(json?.error||('HTTP '+res.status));
-    const u=usageNow(); u.count++; saveUsage();
+    consumeAi();
     if(S._outfitTok!==tok) return;               // 待っている間に閉じられた
     const ids=new Set(cands.map(i=>i.id));
     const found=(json.result?.worn||[]).filter(w=>ids.has(w.id))
@@ -1255,33 +1321,114 @@ async function outfitIdentify(file){
 function renderOutfit(){
   const o=S._outfit; if(!o) return;
   const m=memberOf(o.mid);
-  const tiles=o.found.map(w=>{
-    const it=S.items.find(i=>i.id===w.id); if(!it) return '';
+  const tile=(it,label)=>{
     const on=o.pick.has(it.id);
-    const already=S.wears.some(x=>x.itemId===it.id&&x.date===o.day);
     return `<button class="tile ${on?'worn':''}" data-pick="${it.id}">
       <div class="ph" data-photo="${it.photoId||''}">${catOf(it.category).g}</div>
-      ${on?'<span class="flag ok"></span>':''}
-      <span class="tag">${already?'記録済み':'確度 '+Math.round((w.confidence||0)*100)+'%'}</span></button>`;
-  }).join('');
+      ${on?'<span class="flag ok"></span>':''}${label?`<span class="tag">${label}</span>`:''}</button>`;
+  };
+  const done=it=>S.wears.some(x=>x.itemId===it.id&&x.date===o.day);
+  let body, manualList=null;
+  if(o.mode==='manual'){
+    const all=S.items.filter(i=>isActive(i)&&i.memberId===o.mid);
+    const cats=CATS.filter(c=>all.some(i=>i.category===c.id));
+    manualList=sortItems(all.filter(i=>!o.cat||i.category===o.cat),'recent');
+    body=`<p class="tiny muted" style="margin:0 0 8px">${esc(m?.name||'')}さんの服から選んでください。</p>
+      <div class="filters">${[`<button class="chip" data-ocat="" aria-pressed="${!o.cat}">すべて</button>`,
+        ...cats.map(c=>`<button class="chip" data-ocat="${c.id}" aria-pressed="${o.cat===c.id}">${c.g} ${c.n}</button>`)].join('')}</div>
+      <div class="grid" id="opick-grid"></div>`;
+  }else{
+    const tiles=o.found.map(w=>{ const it=S.items.find(i=>i.id===w.id); if(!it) return '';
+      return tile(it, done(it)?'記録済み':'確度 '+Math.round((w.confidence||0)*100)+'%') }).join('');
+    body=`<p class="tiny muted" style="margin:0 0 10px">${esc(m?.name||'')}さんの服から見つけました。タップで選択を切り替えられます（${esc(fmtMD(o.day))}の記録）。</p>
+      ${o.found.length?`<div class="grid" style="margin-top:0">${tiles}</div>`
+        :`<div class="note amber">登録済みの服の中に、当てはまるものが見つかりませんでした。</div>`}`;
+  }
+  const unmatched=o.unmatched.length?`<div class="card" style="margin-top:12px;padding:6px 14px">
+      <div class="tiny muted" style="padding:6px 0">未登録かもしれない服</div>
+      ${o.unmatched.map((u,i)=>`<div class="hist"><b style="min-width:0;flex:1">${esc(u)}</b>
+        <button class="linkish" data-oreg="${i}" style="color:var(--indigo)">登録する</button></div>`).join('')}
+    </div>`:'';
   openSheet(`
-    <div class="shead"><h3>この服を着ていますか？</h3><button class="x" data-close>閉じる</button></div>
-    <img class="outfit-photo" src="${o.photo}" alt="">
-    <p class="tiny muted" style="margin:0 0 10px">${esc(m?.name||'')}さんの服から見つけました。タップで選択を切り替えられます（${esc(fmtMD(o.day))}の記録）。</p>
-    ${o.found.length?`<div class="grid" style="margin-top:0">${tiles}</div>`
-      :`<div class="note amber">登録済みの服の中に、当てはまるものが見つかりませんでした。</div>`}
-    ${o.unmatched.length?`<div class="note indigo tiny" style="margin-top:12px">未登録かもしれない服：${o.unmatched.map(esc).join('、')}</div>`:''}
+    <div class="shead"><h3>${o.mode==='manual'?'一覧から選ぶ':'この服を着ていますか？'}</h3><button class="x" data-close>閉じる</button></div>
+    ${o.mode==='manual'?'':`<img class="outfit-photo" src="${o.photo}" alt="">`}
+    ${body}
+    ${o.mode==='manual'?'':unmatched}
     <div class="act col">
       <button class="btn wide" data-outfitsave ${o.pick.size?'':'disabled'}>選んだ${o.pick.size}着を記録する</button>
-      <button class="btn ghost wide" data-close>やめる</button>
-    </div><div class="sp"></div>`);
+    </div>
+    <div class="act">
+      <button class="btn sub" data-outfitmode="${o.mode==='manual'?'ai':'manual'}">${o.mode==='manual'?'AIの候補に戻る':'一覧から自分で選ぶ'}</button>
+      <button class="btn sub" data-oreg="">新しく登録する</button>
+    </div>
+    <div class="act"><button class="btn ghost wide" data-close>やめる</button></div>
+    <div class="sp"></div>`);
+  if(manualList) chunkGrid($('#opick-grid'), manualList, it=>tile(it, done(it)?'記録済み':''), 'sheet');
   hydratePhotos($('#sheet-inner'));
 }
+
+/* ---- 着た日の写真 --------------------------------------- */
+async function resizeTo(blob,max,q){
+  const bmp=await loadBitmap(blob);
+  const w=bmp.width||bmp.naturalWidth, h=bmp.height||bmp.naturalHeight;
+  const sc=Math.min(1,max/Math.max(w,h));
+  const cv=document.createElement('canvas'); cv.width=Math.round(w*sc); cv.height=Math.round(h*sc);
+  const cx=cv.getContext('2d'); cx.imageSmoothingEnabled=true; cx.imageSmoothingQuality='high';
+  cx.drawImage(bmp,0,0,cv.width,cv.height);
+  if(bmp.close) bmp.close();
+  return new Promise(r=>cv.toBlob(r,'image/jpeg',q));
+}
+/* 拡大用（長辺640px・約70KB）と小さい版（長辺240px・約10KB）を保存する */
+async function saveOutfitPhoto(o){
+  if(o.outfitId) return o.outfitId;
+  const src=await (await fetch(o.photo)).blob();
+  const id=uid();
+  await dbPut('photos',{id,blob:await resizeTo(src,640,0.72)});
+  await dbPut('thumbs',{id,blob:await resizeTo(src,240,0.7)});
+  await dbPut('outfits',{id,memberId:o.mid,date:o.day,createdAt:Date.now(),big:true});
+  o.outfitId=id;
+  return id;
+}
+async function deleteOutfit(id){
+  await dbDel('photos',id); await dbDel('thumbs',id); await dbDel('outfits',id);
+  const u=urlCache.get(id); if(u){ URL.revokeObjectURL(u); urlCache.delete(id) }
+}
+/* 保存期間の整理。拡大用だけを消し、小さい版と記録は残す */
+async function enforcePhotoRetention(){
+  const all=await dbAll('outfits'); if(!all.length) return;
+  const used=new Set(S.wears.map(w=>w.outfitId).filter(Boolean));
+  const now=Date.now();
+  for(const o of all){ if(!used.has(o.id) && now-o.createdAt>86400000) await deleteOutfit(o.id) }
+  const keep=plan().photoKeep;
+  const bigs=all.filter(o=>o.big&&used.has(o.id)).sort((a,b)=>b.createdAt-a.createdAt);
+  const drop=keep.days ? bigs.filter(o=>now-o.createdAt>keep.days*86400000) : bigs.slice(keep.count);
+  for(const o of drop){
+    await dbDel('photos',o.id); o.big=false; await dbPut('outfits',o);
+    const u=urlCache.get(o.id); if(u){ URL.revokeObjectURL(u); urlCache.delete(o.id) }
+  }
+  await reload();
+}
+async function openWearPhoto(oid){
+  const o=S.outfits.find(x=>x.id===oid);
+  const big=o?.big ? await photoURL(oid) : null;
+  const small=big ? null : await thumbURL(oid);
+  const items=S.wears.filter(w=>w.outfitId===oid).map(w=>S.items.find(i=>i.id===w.itemId)).filter(Boolean);
+  openSheet(`
+    <div class="shead"><h3>${o?esc(fmtMD(o.date)):''}の写真</h3><button class="x" data-close>閉じる</button></div>
+    ${big||small?`<img class="outfit-photo" src="${big||small}" alt="">`:'<div class="empty"><p>写真が見つかりません</p></div>'}
+    ${!big&&small?`<p class="tiny muted" style="margin:0">拡大用の写真は保存期間（${keepLabel(plan())}）を過ぎたので、小さい写真を表示しています。</p>`:''}
+    ${items.length?`<h2 class="sec">この日に記録した服<span class="c">${items.length}着</span></h2>
+      <div class="grid">${items.map(it=>`<button class="tile" data-item="${it.id}"><div class="ph" data-photo="${it.photoId||''}">${catOf(it.category).g}</div></button>`).join('')}</div>`:''}
+    <div class="sp"></div>`);
+  hydratePhotos($('#sheet-inner'));
+}
+
 /* まとめて記録。1着ずつ再描画しないよう、書き込んでから数え直す */
-async function addWears(ids,date){
+async function addWears(ids,date,outfitId=null){
   for(const id of ids){
-    if(S.wears.some(w=>w.itemId===id&&w.date===date)) continue;
-    await dbPut('wears',{id:uid(),itemId:id,date});
+    const ex=S.wears.find(w=>w.itemId===id&&w.date===date);
+    if(ex){ if(outfitId&&!ex.outfitId){ ex.outfitId=outfitId; await dbPut('wears',ex) } continue }
+    await dbPut('wears',{id:uid(),itemId:id,date,outfitId});
   }
   await reload();
   for(const id of ids){
@@ -1290,16 +1437,22 @@ async function addWears(ids,date){
     it.wearCount=ds.length; it.lastWorn=ds.length?ds[ds.length-1]:null;
     await dbPut('items',it);
   }
-  await reload(); render();
+  await enforcePhotoRetention();
+  render();
 }
-
 async function drawTodayGrid(){
   const g=$('#today-grid'); if(!g) return;
   const day=S.wearDate||today();
-  const list=S.items.filter(i=>isActive(i)&&i.memberId===S._todayMem)
-    .sort((a,b)=>(b.lastWorn||'').localeCompare(a.lastWorn||''));
+  const all=S.items.filter(i=>isActive(i)&&i.memberId===S._todayMem);
+  const cats=CATS.filter(c=>all.some(i=>i.category===c.id));
+  if(S._todayCat && !cats.some(c=>c.id===S._todayCat)) S._todayCat=null;
+  const cb=$('#today-cat');
+  if(cb) cb.innerHTML = cats.length>1 ? [`<button class="chip" data-tcat="" aria-pressed="${!S._todayCat}">すべて</button>`,
+    ...cats.map(c=>`<button class="chip" data-tcat="${c.id}" aria-pressed="${S._todayCat===c.id}">${c.g} ${c.n}</button>`)].join('') : '';
+  const list=all.filter(i=>!S._todayCat||i.category===S._todayCat)
+    .sort((a,b)=>(b.lastWorn||'').localeCompare(a.lastWorn||'')||String(b.id).localeCompare(String(a.id)));
   if(!list.length){
-    if(chunkIO){ chunkIO.disconnect(); chunkIO=null }
+    stopChunk('main');
     g.innerHTML=`<div class="tiny muted" style="grid-column:1/-1">この人の服はまだありません。</div>`; return;
   }
   chunkGrid(g, list, it=>{
@@ -1375,9 +1528,10 @@ async function loadThumbInto(el){
 }
 /* 一覧を60枚ずつ描く。末尾に近づいたら次を足す */
 const CHUNK=60;
-let chunkIO=null;
-function chunkGrid(container,list,tileFn){
-  if(chunkIO){ chunkIO.disconnect(); chunkIO=null }
+const chunkIOs=new Map();   // ホームの一覧とシート内の一覧が互いに止め合わないよう、名前ごとに持つ
+function stopChunk(key){ const ob=chunkIOs.get(key); if(ob){ ob.disconnect(); chunkIOs.delete(key) } }
+function chunkGrid(container,list,tileFn,key='main'){
+  stopChunk(key);
   container.innerHTML='';
   let i=0;
   const sentinel=document.createElement('div');
@@ -1389,13 +1543,13 @@ function chunkGrid(container,list,tileFn){
     while(tmp.firstChild) container.insertBefore(tmp.firstChild,sentinel);
     i+=CHUNK;
     hydratePhotos(container);
-    if(i>=list.length){ if(chunkIO){ chunkIO.disconnect(); chunkIO=null } sentinel.remove() }
+    if(i>=list.length){ stopChunk(key); sentinel.remove() }
   };
   add();
   if(i<list.length){
     if('IntersectionObserver' in window){
-      chunkIO=new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)) add() },{rootMargin:'800px 0px'});
-      chunkIO.observe(sentinel);
+      const ob=new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)) add() },{rootMargin:'800px 0px'});
+      chunkIOs.set(key,ob); ob.observe(sentinel);
     }else{ while(i<list.length) add() }
   }
 }
@@ -1418,6 +1572,11 @@ function renderAdd(){
   const sizes = kid?KID_SIZES.map(String):ADULT_SIZES;
 
   $('#add-body').innerHTML=`
+  ${!canAddItem()?`<div class="note amber" style="margin-bottom:10px">${plan().name}プランで登録できる服は${plan().items}着までです。登録済みの服はそのまま見られます。
+    <button class="linkish" data-limit="items" style="display:block;margin-top:6px">プランを見る</button></div>`:''}
+  ${d?.wearOn?`<div class="note ok" style="margin-bottom:10px">${d.hint?`「${esc(d.hint)}」を登録します。`:''}保存すると、${esc(fmtMD(d.wearOn.date))}に着た服としても記録します。
+    ${d.outfitSrc&&!d.photoURL?`<div class="act" style="margin-top:8px"><button class="btn sub sm" id="use-outfit">さっきの全身写真で登録する</button></div>`:''}
+    <button class="linkish" id="cancel-wearon" style="display:block;margin-top:8px">着た記録はしない</button></div>`:''}
   <div class="card">
     <button class="shot ${d?.photoURL?'has':''}" id="shot-label">
       ${d?.photoURL?`<img src="${d.photoURL}" alt="撮影した服">`:'<span class="g">📷</span><span>服を撮る</span>'}
@@ -1577,13 +1736,26 @@ function renderSet(){
     </div>
     <div class="act"><button class="btn ghost sm" id="save-api">接続を確認する</button></div>
     <div class="hr"></div>
-    <div class="fc-row"><b>${aiUnlimited()?'無制限':usageNow().count+' / '+S.settings.aiFreeLimit}</b>
+    <div class="fc-row"><b>${usageNow().count} / ${plan().ai}</b>
       <span>今月の判別回数</span>
       <em class="${aiRemaining()<=0?'amber':'indigo'}">${aiRemainLabel()}</em></div>
-    <div class="act">
-      <button class="btn ${aiUnlimited()?'':'ghost'} wide" id="toggle-plan">${aiUnlimited()?'現在：無制限プラン':'無料プラン（月'+S.settings.aiFreeLimit+'回まで）'}</button>
-    </div>
-    <p class="tiny muted" style="margin:10px 0 0">プラン切替は動作確認用です。回数は端末内で数えているだけなので、公開時はサーバー側で管理します。</p>
+    <p class="tiny muted" style="margin:10px 0 0">写真で記録も1回として数えます。</p>
+  </div>`;
+
+  const pk=livePacks(), bigN=S.outfits.filter(o=>o.big).length;
+  h+=`<h2 class="sec">プラン<span class="c">動作確認用</span></h2><div class="card">
+    <div class="chips">${Object.entries(PLANS).map(([k,x])=>
+      `<button class="chip" data-plan="${k}" aria-pressed="${planKey()===k}">${x.name}</button>`).join('')}</div>
+    ${planTable()}
+    <dl class="kv">
+      <dt>家族</dt><dd>${S.members.length} / ${plan().members}人</dd>
+      <dt>服</dt><dd>${countItems()} / ${plan().items}着</dd>
+      <dt>着た日の写真</dt><dd>拡大用 ${bigN}枚（${keepLabel(plan())}）</dd>
+      <dt>AI（今月）</dt><dd>${usageNow().count} / ${plan().ai}回</dd>
+      <dt>回数パック</dt><dd>${pk.length?`残り${packLeft()}回（期限 ${ymd(new Date(pk[0].expires))}）`:'なし'}</dd>
+    </dl>
+    <div class="act"><button class="btn sub sm" id="add-pack">回数パックを追加（${PACK_SIZE}回・テスト）</button></div>
+    <p class="tiny muted" style="margin:10px 0 0">実際の購入はストア公開時にアプリ内課金でつなぎます。今は端末内の仮の数字です。プランを下げると、保存期間を過ぎた拡大写真は整理されます（小さい写真と記録は残ります）。</p>
   </div>`;
 
   h+=`<h2 class="sec">写真の仕上げ</h2><div class="card">
@@ -1596,6 +1768,9 @@ function renderSet(){
   </div>`;
 
   h+=`<h2 class="sec">バックアップ</h2><div class="card">
+    <div class="note ${S._persisted?'ok':'amber'} tiny" style="margin-bottom:12px">${S._persisted
+      ? 'データ保護：有効。ブラウザが容量整理でこのアプリのデータを消すことはありません。'
+      : 'データ保護：未確認。ホーム画面に追加して使うと、ブラウザにデータを消されにくくなります。'}</div>
     <p class="tiny muted" style="margin:0 0 12px">データはこの端末のブラウザ内だけに保存されています。ブラウザのデータを消すと失われます。定期的に書き出してください。</p>
     <div class="act">
       <button class="btn sub" id="exp-meta">データのみ書き出す</button>
@@ -1632,24 +1807,38 @@ async function openItem(id){
   const it=S.items.find(i=>i.id===id); if(!it) return;
   const m=memberOf(it.memberId), c=catOf(it.category);
   const u=await photoURL(it.photoId);
-  const d=daysSince(it.lastWorn);
   const est=estPrice(it);
   const cpw=(it.price&&it.wearCount)?Math.round(Number(it.price)/it.wearCount):null;
   const hd=isOutgrown(it)?handDownTarget(it):null;
-  const mo=(ageOf(m)??99)<=15?monthsLeft(m,sizeNum(it.size)):null;
+  const mo=m&&isKidMember(m)?monthsLeft(m,sizeNum(it.size)):null;
   const moLab=mo===null?null:monthsLabel(mo);
+  const wornToday=S.wears.some(w=>w.itemId===it.id&&w.date===today());
+  const hist=S.wears.filter(w=>w.itemId===it.id).sort((a,b)=>b.date.localeCompare(a.date));
 
   openSheet(`
-  <div class="shead"><h3>${esc([c.n,it.size].filter(Boolean).join(' '))}</h3><button class="x" data-close>閉じる</button></div>
+  <div class="shead"><h3>${esc([c.n,it.size?sizeLabel(it.size):''].filter(Boolean).join(' '))}</h3>
+    <span class="shead-act"><button class="x" data-edit="${it.id}">編集</button><button class="x" data-close>閉じる</button></span></div>
   ${u?`<img class="hero" src="${u}" alt="">`:`<div class="hero" style="display:flex;align-items:center;justify-content:center;font-size:52px">${c.g}</div>`}
   <div class="agebar">${esc(ageLine(it))}</div>
+
+  <div class="act">
+    ${wornToday
+      ? `<button class="btn sub" data-wear2="${it.id}">今日の記録を取り消す</button>`
+      : `<button class="btn" data-wear2="${it.id}">今日着た</button>`}
+    <label class="btn ghost datebtn">📅 別の日に着た
+      <input type="date" id="item-wear-date" data-for="${it.id}" max="${today()}" aria-label="着た日を選ぶ"></label>
+  </div>
+
+  ${hd?`<div class="note ok" style="margin-top:12px">${esc(hd.name)}さんの今のサイズに合います。おさがりに回せます。
+    <div class="act" style="margin-top:8px"><button class="btn sub sm" data-handdown="${it.id}">${esc(hd.name)}さんへ移す</button></div></div>`:''}
+  ${isOutgrown(it)&&!hd?`<div class="note amber" style="margin-top:12px">サイズアウトしています。${est?'出品の目安は '+yen(est)+' 前後です。':''}</div>`:''}
+
   <dl class="kv">
     <dt>持ち主</dt><dd>${esc(m?m.name:'—')}</dd>
     <dt>色</dt><dd>${esc(it.color||'—')}</dd>
     <dt>ブランド</dt><dd>${esc(it.brand||'—')}</dd>
     <dt>シーズン</dt><dd>${(it.season||[]).join('・')||'—'}</dd>
     <dt>持っている枚数</dt><dd><span class="qtyctl"><button data-qty="${it.id}|-1" aria-label="減らす">−</button><b>${it.qty||1}枚</b><button data-qty="${it.id}|1" aria-label="増やす">＋</button></span></dd>
-    <dt>着用回数</dt><dd>${it.wearCount||0}回</dd>
     <dt>最後に着た日</dt><dd>${it.lastWorn?`${esc(fmtMD(it.lastWorn))}・${agoLabel(it.lastWorn)}`:'まだ着ていません'}</dd>
     <dt>買った時期</dt><dd>${purchaseLabel(it)?esc(purchaseLabel(it)):`<button class="linkish" data-edit="${it.id}">未登録（入力する）</button>`}</dd>
     <dt>登録した日</dt><dd>${it.addedAt?`${esc(fmtYM(it.addedAt))}・${agoLabel(it.addedAt)}`:'—'}</dd>
@@ -1657,38 +1846,28 @@ async function openItem(id){
     ${cpw!==null?`<dt>1回あたり</dt><dd>${yen(cpw)}</dd>`:''}
     ${moLab?`<dt>着られる期間</dt><dd>${moLab}</dd>`:''}
   </dl>
-  ${hd?`<div class="note ok">${esc(hd.name)}さんの今のサイズに合います。おさがりに回せます。</div>`:''}
-  ${isOutgrown(it)&&!hd?`<div class="note amber">サイズアウトしています。${est?'出品の目安は '+yen(est)+' 前後です。':''}</div>`:''}
-  <div class="act">
-    ${S.wears.some(w=>w.itemId===it.id&&w.date===today())
-      ? `<button class="btn sub" data-wear2="${it.id}">今日の記録を取り消す</button>`
-      : `<button class="btn" data-wear2="${it.id}">今日着た</button>`}
-    <label class="btn ghost datebtn">📅 別の日に着た
-      <input type="date" id="item-wear-date" data-for="${it.id}" max="${today()}" aria-label="着た日を選ぶ"></label>
-    ${hd?`<button class="btn sub" data-handdown="${it.id}">${esc(hd.name)}さんへ</button>`:''}
-  </div>
+
+  ${hist.length?`<h2 class="sec">着た日<span class="c">${hist.length}回</span></h2>
+    <div class="card" style="padding:4px 14px">
+      ${hist.slice(0,10).map(w=>`<div class="hist">
+        ${w.outfitId
+          ? `<button class="histph" data-wphoto="${w.outfitId}" aria-label="その日の写真を見る"><i data-photo="${w.outfitId}">📷</i></button>`
+          : `<i class="histph none"></i>`}
+        <b>${esc(fmtMD(w.date))}</b><span>${agoLabel(w.date)}</span>
+        <button data-unwear="${it.id}|${w.date}">取り消す</button></div>`).join('')}
+      ${hist.length>10?`<div class="tiny muted" style="padding:8px 0">ほか${hist.length-10}回</div>`:''}
+    </div>`:''}
+
+  <h2 class="sec">手放す・管理</h2>
   <div class="act">
     <button class="btn ghost" data-listing="${it.id}">出品文をつくる</button>
-    <button class="btn ghost" data-edit="${it.id}">編集</button>
-  </div>
-  ${(()=>{
-    const ds=S.wears.filter(w=>w.itemId===it.id).map(w=>w.date).sort().reverse();
-    if(!ds.length) return '';
-    const shown=ds.slice(0,8);
-    return `<h2 class="sec">着た日<span class="c">${ds.length}回</span></h2><div class="card" style="padding:4px 16px">
-      ${shown.map(dt=>`<div class="hist"><b>${esc(fmtMD(dt))}</b><span>${agoLabel(dt)}</span>
-        <button data-unwear="${it.id}|${dt}">取り消す</button></div>`).join('')}
-      ${ds.length>8?`<div class="tiny muted" style="padding:8px 0">ほか${ds.length-8}回</div>`:''}
-    </div>`;
-  })()}
-  <div class="hr"></div>
-  <div class="act">
     ${it.status==='listed'
       ? `<button class="btn sub" data-status="${it.id}|sold">売れた</button><button class="btn ghost" data-status="${it.id}|active">出品を取り消す</button>`
       : `<button class="btn ghost" data-status="${it.id}|listed">出品中にする</button>`}
-    <button class="btn ghost" data-del="${it.id}" style="color:var(--danger)">削除</button>
   </div>
+  <div class="act"><button class="btn ghost wide" data-del="${it.id}" style="color:var(--danger)">この服を削除</button></div>
   <div class="sp"></div>`);
+  hydratePhotos($('#sheet-inner'));
 }
 
 function openListing(id){
@@ -1792,7 +1971,10 @@ function openEdit(id){
 async function wearItem(id,date=today()){
   const it=S.items.find(i=>i.id===id); if(!it) return;
   const exist=S.wears.find(w=>w.itemId===id&&w.date===date);
-  if(exist) await dbDel('wears',exist.id);
+  if(exist){
+    await dbDel('wears',exist.id);
+    if(exist.outfitId && !S.wears.some(w=>w.id!==exist.id&&w.outfitId===exist.outfitId)) await deleteOutfit(exist.outfitId);
+  }
   else await dbPut('wears',{id:uid(),itemId:id,date});
   // 回数と最終着用日は、記録そのものから数え直す。過去の日付を足しても順序が崩れない
   const dates=S.wears.filter(w=>w.itemId===id&&w.id!==exist?.id).map(w=>w.date);
@@ -1822,6 +2004,7 @@ async function saveDraft(keepGoing){
   const mid=d.memberId??S.lastUsed.memberId??S.members[0]?.id;
   if(!mid){ toast('家族を先に登録してください'); return }
   if(!d.category){ toast('カテゴリを選んでください'); return }
+  if(!canAddItem()) return openLimit('items');
 
   let photoId=null;
   if(d.blob){
@@ -1843,23 +2026,35 @@ async function saveDraft(keepGoing){
     wearCount:0, lastWorn:null, addedAt:today()
   };
   await dbPut('items',it);
+  const wo=d.wearOn;
+  if(wo){
+    await dbPut('wears',{id:uid(),itemId:it.id,date:wo.date,outfitId:wo.outfitId||null});
+    it.wearCount=1; it.lastWorn=wo.date; await dbPut('items',it);
+  }
   S.lastUsed={memberId:mid,category:d.category};
   if(d.photoURL) URL.revokeObjectURL(d.photoURL);
-  S.draft = keepGoing ? {memberId:mid,category:d.category,size:d.size,season:d.season} : null;
+  // 同じ写真に未登録の服が複数あることがあるので、「次へ」のときは着た記録の予定を引き継ぐ
+  S.draft = keepGoing ? {memberId:mid,category:d.category,size:d.size,season:d.season,
+    ...(wo?{wearOn:wo,outfitSrc:d.outfitSrc}:{})} : null;
   await reload();
-  toast('保存しました');
+  toast(wo?`登録して、${fmtMD(wo.date)}に着た服として記録しました`:'保存しました');
   if(keepGoing){ renderAdd(); window.scrollTo(0,0) }
-  else go('closet');
+  else go(wo?'today':'closet');
 }
 
 async function exportData(withPhotos){
-  const data={version:2,exportedAt:new Date().toISOString(),
-    members:S.members,items:S.items,wears:S.wears,growth:S.growth,photos:[]};
+  const data={version:3,exportedAt:new Date().toISOString(),
+    members:S.members,items:S.items,wears:S.wears,growth:S.growth,outfits:S.outfits,photos:[],thumbs:[]};
   if(withPhotos){
     const ps=await dbAll('photos');
     for(const p of ps){
       const b64=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(p.blob)});
       data.photos.push({id:p.id,dataURL:b64});
+    }
+    for(const o of S.outfits){   // 着た日の写真は小さい版も書き出す（拡大用が消えていても残るように）
+      const t=await dbGet('thumbs',o.id); if(!t) continue;
+      const b64=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(t.blob)});
+      data.thumbs.push({id:o.id,dataURL:b64});
     }
   }
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
@@ -1879,9 +2074,13 @@ async function importData(file){
     for(const i of d.items) await dbPut('items',i);
     for(const w of (d.wears||[])) await dbPut('wears',w);
     for(const gr of (d.growth||[])) await dbPut('growth',gr);
+    for(const o of (d.outfits||[])) await dbPut('outfits',o);
     for(const p of (d.photos||[])){
       const res=await fetch(p.dataURL); const blob=await res.blob();
       await dbPut('photos',{id:p.id,blob});
+    }
+    for(const t of (d.thumbs||[])){
+      const res=await fetch(t.dataURL); await dbPut('thumbs',{id:t.id,blob:await res.blob()});
     }
     urlCache.clear(); thumbCache.clear();
     await reload(); render();
@@ -1941,7 +2140,7 @@ async function aiAnalyze(){
     if(!res.ok||!json?.ok) throw new Error(json?.error||('HTTP '+res.status));
 
     // 成功したときだけ回数を消費する
-    const u=usageNow(); u.count++; saveUsage();
+    consumeAi();
 
     S.draft={...S.draft,aiBusy:false};
     applyAnalysis(json.result);
@@ -2006,7 +2205,7 @@ async function acceptPhoto(source){
   if(S.settings.aiMode==='auto' && S.draft?.blob) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#ai-run,#outfit-shot,#save-api,#toggle-plan,[data-aimode]');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
@@ -2081,7 +2280,7 @@ document.addEventListener('click',async e=>{
   }
   if(g('data-item'))  return openItem(g('data-item'));
   if(g('data-member'))return openMemberForm(g('data-member'));
-  if(t.id==='add-member') return openMemberForm(null);
+  if(t.id==='add-member') return canAddMember() ? openMemberForm(null) : openLimit('members');
 
   /* --- 登録フォーム --- */
   if(g('data-dmem')){ syncAdd(); S.draft={...(S.draft||{}),memberId:g('data-dmem'),size:undefined}; return renderAdd() }
@@ -2100,6 +2299,29 @@ document.addEventListener('click',async e=>{
   if(t.id==='cam-shoot') return shootCamera();
   if(t.id==='ai-run') return aiAnalyze();
   if(t.id==='outfit-shot') return $('#outfit-file').click();
+  if(t.hasAttribute('data-tcat')){ S._todayCat=g('data-tcat')||null; return drawTodayGrid() }
+  if(g('data-wphoto')) return openWearPhoto(g('data-wphoto'));
+  if(g('data-outfitmode')){ if(S._outfit){ S._outfit.mode=g('data-outfitmode'); S._outfit.cat=null } return renderOutfit() }
+  if(t.hasAttribute('data-ocat')){ if(S._outfit) S._outfit.cat=g('data-ocat')||null; return renderOutfit() }
+  if(t.hasAttribute('data-oreg')){
+    const o=S._outfit; if(!o) return;
+    if(!canAddItem()){ closeSheet(); return openLimit('items') }
+    const idx=g('data-oreg'), hint=idx!==''?(o.unmatched[Number(idx)]||''):'';
+    const n=o.pick.size;
+    const oid=await saveOutfitPhoto(o);
+    if(n) await addWears([...o.pick], o.day, oid);   // 選んでいた服は先に記録しておく
+    S._outfit=null; closeSheet();
+    if(S.draft?.photoURL) URL.revokeObjectURL(S.draft.photoURL);
+    S.draft={memberId:o.mid, wearOn:{date:o.day,outfitId:oid}, outfitSrc:o.photo, hint};
+    go('add');
+    toast(n?`${n}着を記録しました。続けて新しい服を登録します`:'新しい服を登録します');
+    return;
+  }
+  if(t.id==='use-outfit'){
+    const src=S.draft?.outfitSrc; if(!src) return;
+    return acceptPhoto(await (await fetch(src)).blob());
+  }
+  if(t.id==='cancel-wearon'){ S.draft={...S.draft,wearOn:null,outfitSrc:null,hint:''}; return renderAdd() }
   if(g('data-pick')){
     const id=g('data-pick'), pk=S._outfit?.pick; if(!pk) return;
     pk.has(id)?pk.delete(id):pk.add(id);
@@ -2108,7 +2330,8 @@ document.addEventListener('click',async e=>{
   if(t.hasAttribute('data-outfitsave')){
     const o=S._outfit; if(!o||!o.pick.size) return;
     const n=o.pick.size;
-    await addWears([...o.pick], o.day);
+    const oid=await saveOutfitPhoto(o);
+    await addWears([...o.pick], o.day, oid);
     S._outfit=null; closeSheet();
     toast(`${n}着を記録しました`);
     return;
@@ -2116,10 +2339,16 @@ document.addEventListener('click',async e=>{
   if(g('data-aimode')){
     S.settings.aiMode=g('data-aimode'); saveSettings(); renderSet(); return;
   }
-  if(t.id==='toggle-plan'){
-    S.settings.plan = aiUnlimited() ? 'free' : 'unlimited';
-    saveSettings(); renderSet(); return;
+  if(g('data-plan')){
+    S.settings.plan=g('data-plan'); saveSettings();
+    await enforcePhotoRetention(); renderSet();
+    toast(plan().name+'プランに切り替えました（テスト）'); return;
   }
+  if(t.id==='add-pack'){
+    S.packs.push({id:uid(),remaining:PACK_SIZE,expires:Date.now()+PACK_DAYS*86400000});
+    savePacks(); renderSet(); toast('回数パックを追加しました（テスト）'); return;
+  }
+  if(g('data-limit')) return openLimit(g('data-limit'));
   if(t.id==='save-api'){
     try{
       const r=await fetch(API_BASE+'/health');
@@ -2154,6 +2383,7 @@ document.addEventListener('click',async e=>{
     const name=($('#m-name').value||'').trim();
     if(!name){ toast('名前を入れてください'); return }
     const exist=memberOf(id);
+    if(!exist && !canAddMember()){ closeSheet(); return openLimit('members') }
     await dbPut('members',{id,name,birthday:$('#m-bd').value||null,
       currentSize:S._msize||exist?.currentSize||null,
       color:S._mcolor||exist?.color||MEMBER_COLORS[S.members.length%MEMBER_COLORS.length].n,
@@ -2303,6 +2533,8 @@ document.addEventListener('change',async e=>{
     await openDB();
     await reload();
     const fixed=await repairPhotoLinks();
+    await requestPersist();
+    await enforcePhotoRetention();
     const ver=$('#ver'); if(ver) ver.textContent='v'+APP_VERSION;
     go('today');
     backfillHashes();
