@@ -1347,11 +1347,12 @@ async function outfitIdentify(file){
     consumeAi();
     if(S._outfitTok!==tok) return;               // 待っている間に閉じられた
     const ids=new Set(cands.map(i=>i.id));
-    const found=(json.result?.worn||[]).filter(w=>ids.has(w.id))
+    // 40%未満は出さない（色違いなどの的外れな候補が並ぶため）。拾いたいときは「一覧から自分で選ぶ」
+    const found=(json.result?.worn||[]).filter(w=>ids.has(w.id)&&(w.confidence||0)>=0.4)
       .sort((a,b)=>(b.confidence||0)-(a.confidence||0));
     S._outfit={day, mid, photo:image, found,
       unmatched:(json.result?.unmatched||[]).slice(0,4),
-      pick:new Set(found.filter(w=>(w.confidence||0)>=0.6).map(w=>w.id))};
+      pick:new Set(found.filter(w=>(w.confidence||0)>=0.7).map(w=>w.id))};
     renderOutfit();
   }catch(err){
     if(S._outfitTok===tok){ closeSheet(); toast('判別できませんでした') }
