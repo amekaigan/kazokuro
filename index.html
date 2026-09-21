@@ -344,6 +344,7 @@ const MEMBER_COLORS = [
 const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
 const KID_SIZES = [80,90,100,110,120,130,140,150,160];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL','F'];
+const API_BASE = 'https://kazokuro-api.ishimonzukan.workers.dev';  // AI判別を中継するWorker
 const STALE_DAYS = 120;      // これ以上着ていなければ「眠っている服」
 const MERCARI_MIN = 300;
 const SIZE_MARGIN = 5;       // 「110サイズ」は身長115cmくらいまで着られる、という目安
@@ -426,7 +427,7 @@ const S = {
   fMember:'all', fCat:'all',
   draft:null,          // 登録中の1着
   lastUsed:{memberId:null,category:null},
-  settings:{normalize:true, aiMode:'button', apiBase:'', aiFreeLimit:30, plan:'free'},
+  settings:{normalize:true, aiMode:'button', aiFreeLimit:30, plan:'free'},
   usage:{month:'', count:0}
 };
 try{
@@ -1122,9 +1123,7 @@ function renderSet(){
       ${[['auto','撮ったら自動'],['button','ボタンを押したとき'],['off','使わない']].map(([v,n])=>
         `<button class="chip" data-aimode="${v}" aria-pressed="${S.settings.aiMode===v}">${n}</button>`).join('')}
     </div>
-    <label class="f" for="api-base">AIサーバーのURL</label>
-    <input type="text" id="api-base" value="${esc(S.settings.apiBase||'')}" placeholder="https://kazokuro-api.〇〇.workers.dev">
-    <div class="act"><button class="btn sub sm" id="save-api">保存して接続を確認</button></div>
+    <div class="act"><button class="btn ghost sm" id="save-api">接続を確認する</button></div>
     <div class="hr"></div>
     <div class="fc-row"><b>${aiUnlimited()?'無制限':usageNow().count+' / '+S.settings.aiFreeLimit}</b>
       <span>今月の判別回数</span>
@@ -1442,8 +1441,7 @@ async function aiAnalyze(){
   const d=S.draft;
   if(!d?.blob){ toast('先に写真を撮ってください'); return }
 
-  const base=(S.settings.apiBase||'').trim().replace(/\/+$/,'');
-  if(!base){ toast('設定でAPIのURLを入れてください'); go('set'); return }
+  const base=API_BASE;
 
   if(aiRemaining()<=0){
     toast('今月のAI判別を使い切りました');
@@ -1523,7 +1521,7 @@ async function acceptPhoto(source){
       aiDone:false,aiError:null,pattern:null,hasCharacterPrint:false};
   }catch(err){ toast('写真を読み込めませんでした') }
   if(S.view!=='add') go('add'); else renderAdd();
-  if(S.settings.aiMode==='auto' && S.draft?.blob && S.settings.apiBase) aiAnalyze();
+  if(S.settings.aiMode==='auto' && S.draft?.blob) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#toggle-norm,#ai-run,#save-api,#toggle-plan,[data-aimode]');
@@ -1568,15 +1566,12 @@ document.addEventListener('click',async e=>{
     saveSettings(); renderSet(); return;
   }
   if(t.id==='save-api'){
-    const v=($('#api-base').value||'').trim().replace(/\/+$/,'');
-    S.settings.apiBase=v; saveSettings();
-    if(!v){ toast('URLを消しました'); return renderSet() }
     try{
-      const r=await fetch(v+'/health');
+      const r=await fetch(API_BASE+'/health');
       const j=await r.json();
       toast(j?.ok?'接続できました':'応答が想定と違います');
     }catch(e){ toast('つながりませんでした') }
-    renderSet(); return;
+    return;
   }
   if(t.id==='toggle-norm'){
     S.settings.normalize=!S.settings.normalize; saveSettings(); renderSet();
