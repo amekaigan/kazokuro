@@ -263,7 +263,10 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 .act.col{flex-direction:column}
 .act.col .btn{min-width:0}
 .datebar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 12px}
-.datebar .datein{width:auto;min-height:48px;border-radius:999px;padding:0 16px;font-weight:600;font-size:15px}
+.datebar .chip{padding:0 15px}
+.datechip,.datebtn{position:relative;overflow:hidden;cursor:pointer}
+.datechip input,.datebtn input{position:absolute;inset:0;width:100%;height:100%;min-height:0;
+  margin:0;padding:0;border:0;opacity:0;-webkit-appearance:none;appearance:none}
 .tile.worn{outline:3px solid var(--ok);outline-offset:-3px}
 .agebar{margin:12px 2px 0;font-size:15px;font-weight:700;color:var(--ink)}
 .linkish{color:var(--indigo);text-decoration:underline;font-weight:700;padding:0;min-height:0}
@@ -373,7 +376,7 @@ const MEMBER_COLORS = [
   {n:'レッド',  hex:'#B84B42'}, {n:'グレー',  hex:'#6B7B82'}
 ];
 const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
-const APP_VERSION = '0.6.0';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
+const APP_VERSION = '0.6.1';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
 const KID_SIZES = ['60','70','80','90','100','110','120','130','140','150','160'];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL'];
 const FREE_SIZE = 'F';         // フリーサイズ。数字ではないのでサイズアウト判定の対象外
@@ -835,7 +838,15 @@ function growthInfo(m){
   return {measured:last.height, measuredAt:last.date, nowH, rate, source, count:hs.length};
 }
 /* 身長 → 今ちょうど良いサイズ（10cm刻み） */
-function fitSize(h){ return Math.min(160,Math.max(80,Math.round(h/10)*10)) }
+/* 身長 → 今ちょうど良い子供服サイズ。子供服の最大（160）を超える身長は大人サイズなので null */
+function fitSize(h){
+  if(!Number.isFinite(h) || h>=165) return null;
+  return Math.max(60,Math.round(h/10)*10);
+}
+function fitSizeText(h){
+  const f=fitSize(h);
+  return f ? `今ちょうど良いのは ${f}cm です。` : '子供服の最大サイズを超えています。大人サイズを選んでください。';
+}
 /* そのサイズがあと何ヶ月着られるか。すでに越えていれば負の値 */
 function monthsLeft(m,size){
   const g=growthInfo(m); if(!g) return null;
@@ -858,6 +869,7 @@ function isActive(it){ return (it.status||'active')==='active' }
 function isOutgrown(it){
   if(!isActive(it)) return false;
   const m=memberOf(it.memberId); if(!m) return false;
+  if(!isKidMember(m)) return false;          // 大人の服はサイズアウトしない
   const s=sizeNum(it.size); if(s===null) return false;
   const g=growthInfo(m);
   if(g) return (s+SIZE_MARGIN) < g.nowH;
@@ -873,9 +885,10 @@ function isStale(it){
 }
 /* 今のその人のサイズ（身長優先） */
 function currentSizeOf(m){
+  // 大人は身長から数字のサイズを出さない。おさがり先に大人が選ばれないようにする
   const g=growthInfo(m);
-  if(g) return fitSize(g.nowH);
-  return sizeNum(m?.currentSize);
+  if(g && isKidMember(m)){ const f=fitSize(g.nowH); if(f) return f }
+  return isKidMember(m) ? sizeNum(m?.currentSize) : null;
 }
 /* おさがり：サイズアウト品を、今それが合う別メンバーへ */
 function handDownTarget(it){
@@ -938,7 +951,7 @@ function forecastCard(m){
   }
   return `<div class="card fc-card">${head}<span>${age}歳・推定 ${g.nowH.toFixed(0)}cm・年 ${g.rate.toFixed(1)}cm（${g.source}）</span></div>
     ${body}
-    <div class="tiny muted" style="margin-top:10px">今ちょうど良いのは ${fitSize(g.nowH)}cm です。${g.source==='平均'?'身長を2回以上記録すると、この子の実際のペースで計算します。':''}</div>
+    <div class="tiny muted" style="margin-top:10px">${fitSizeText(g.nowH)}${g.source==='平均'?'身長を2回以上記録すると、この子の実際のペースで計算します。':''}</div>
   </div>`;
 }
 
@@ -1120,7 +1133,9 @@ function renderToday(){
     ${[[0,'今日'],[1,'昨日'],[2,'おととい']].map(([n,lab])=>{
       const v=ymd(new Date(Date.now()-n*86400000));
       return `<button class="chip" data-wday="${v}" aria-pressed="${day===v}">${lab}</button>`;}).join('')}
-    <input type="date" id="wear-date" class="datein" value="${day}" max="${today()}" aria-label="日付を選ぶ">
+    ${(()=>{const custom=![0,1,2].some(n=>ymd(new Date(Date.now()-n*86400000))===day);
+      return `<label class="chip datechip" aria-pressed="${custom}">📅 ${custom?esc(fmtMD(day).replace(/（.）/,'')):'他の日'}
+        <input type="date" id="wear-date" value="${day}" max="${today()}" aria-label="日付を選ぶ"></label>`;})()}
   </div>`;
   h+= isToday
     ? `<div class="card tiny muted">タップするだけで着用回数と最終着用日が更新されます。つけ忘れた日は、上で日付を選べば後から記録できます。</div>`
@@ -1132,31 +1147,6 @@ function renderToday(){
   if(kids.length){
     h+=`<h2 class="sec">サイズアウト予測</h2>`;
     h+=kids.map(forecastCard).join('');
-  }
-  const fc=[], noHeight=[];
-
-  if(fc.length){
-    h+=`<h2 class="sec">サイズアウト予測</h2>`;
-    h+=fc.map(({m,f})=>{
-      const g=f.g;
-      const rows=f.rows.map(r=>{
-        const lab=monthsLabel(r.months);
-        const cls=r.months<=0?'amber':r.months<=3?'amber':'indigo';
-        return `<div class="fc-row"><b class="num">${r.size}cm</b>
-          <span class="num">${r.count}着</span>
-          <em class="${cls}">${lab}</em></div>`;
-      }).join('');
-      return `<div class="card" style="margin-bottom:10px">
-        <div class="fc-head"><b>${esc(m.name)}</b>
-          <span>${f.age}歳・推定 ${g.nowH.toFixed(0)}cm・年 ${g.rate.toFixed(1)}cm（${g.source}）</span></div>
-        ${rows}
-        <div class="tiny muted" style="margin-top:10px">今ちょうど良いのは ${fitSize(g.nowH)}cm です。${g.source==='平均'?'身長を2回以上記録すると、この子の実際のペースで計算します。':''}</div>
-      </div>`;
-    }).join('');
-  }
-  if(noHeight.length){
-    h+=`<h2 class="sec">身長を記録すると予測できます</h2>`;
-    h+=noHeight.map(m=>`<button class="note amber" data-member="${m.id}" style="display:block;width:100%;text-align:left;margin-bottom:8px">${esc(m.name)}さんの身長がまだ未記録です。タップして入力すると、持っている服があと何ヶ月着られるか出ます。</button>`).join('');
   }
   $('#today-body').innerHTML=h;
 
@@ -1428,7 +1418,8 @@ function renderSet(){
     h+=S.members.map(m=>{
       const a=ageOf(m), n=S.items.filter(i=>i.memberId===m.id&&isActive(i)).length;
       const gi=growthInfo(m);
-      const info=gi?`${gi.nowH.toFixed(0)}cm・${fitSize(gi.nowH)}サイズ・`
+      const fs=gi&&isKidMember(m)?fitSize(gi.nowH):null;
+      const info=gi?`${gi.nowH.toFixed(0)}cm・${fs?fs+'サイズ・':(m.currentSize?esc(sizeLabel(m.currentSize))+'・':'')}`
                    :(m.currentSize?'現在 '+esc(m.currentSize)+'・':'');
       return `<button class="row" data-member="${m.id}" style="width:100%;text-align:left">
         <span class="th av" style="background:${memberHex(m)}">${esc((m.name||'?').slice(0,1))}</span>
@@ -1529,13 +1520,27 @@ async function openItem(id){
   ${hd?`<div class="note ok">${esc(hd.name)}さんの今のサイズに合います。おさがりに回せます。</div>`:''}
   ${isOutgrown(it)&&!hd?`<div class="note amber">サイズアウトしています。${est?'出品の目安は '+yen(est)+' 前後です。':''}</div>`:''}
   <div class="act">
-    <button class="btn" data-wear2="${it.id}">今日着た</button>
+    ${S.wears.some(w=>w.itemId===it.id&&w.date===today())
+      ? `<button class="btn sub" data-wear2="${it.id}">今日の記録を取り消す</button>`
+      : `<button class="btn" data-wear2="${it.id}">今日着た</button>`}
+    <label class="btn ghost datebtn">📅 別の日に着た
+      <input type="date" id="item-wear-date" data-for="${it.id}" max="${today()}" aria-label="着た日を選ぶ"></label>
     ${hd?`<button class="btn sub" data-handdown="${it.id}">${esc(hd.name)}さんへ</button>`:''}
   </div>
   <div class="act">
     <button class="btn ghost" data-listing="${it.id}">出品文をつくる</button>
     <button class="btn ghost" data-edit="${it.id}">編集</button>
   </div>
+  ${(()=>{
+    const ds=S.wears.filter(w=>w.itemId===it.id).map(w=>w.date).sort().reverse();
+    if(!ds.length) return '';
+    const shown=ds.slice(0,8);
+    return `<h2 class="sec">着た日<span class="c">${ds.length}回</span></h2><div class="card" style="padding:4px 16px">
+      ${shown.map(dt=>`<div class="hist"><b>${esc(fmtMD(dt))}</b><span>${agoLabel(dt)}</span>
+        <button data-unwear="${it.id}|${dt}">取り消す</button></div>`).join('')}
+      ${ds.length>8?`<div class="tiny muted" style="padding:8px 0">ほか${ds.length-8}回</div>`:''}
+    </div>`;
+  })()}
   <div class="hr"></div>
   <div class="act">
     ${it.status==='listed'
@@ -1581,7 +1586,9 @@ function openMemberForm(id){
   ${hs.length?`<div style="margin-top:12px">${hs.map(r=>
     `<div class="hist"><b>${r.height}cm</b><span>${r.date}</span>
      <button data-delheight="${r.id}">削除</button></div>`).join('')}</div>`:''}
-  ${g?`<div class="tiny muted" style="margin-top:10px">現在の推定身長 ${g.nowH.toFixed(1)}cm ／ 年 ${g.rate.toFixed(1)}cm ペース（${g.source}）／ 適正サイズ ${fitSize(g.nowH)}cm</div>`:''}
+  ${g?`<div class="tiny muted" style="margin-top:10px">${isKidMember(m)
+      ? `現在の推定身長 ${g.nowH.toFixed(1)}cm ／ 年 ${g.rate.toFixed(1)}cm ペース（${g.source}）／ ${fitSize(g.nowH)?'適正サイズ '+fitSize(g.nowH)+'cm':'大人サイズ'}`
+      : `身長 ${g.measured}cm（大人は成長予測の対象外です）`}</div>`:''}
 
   <label class="f">アイコンの色</label>
   <div class="chips" id="m-color">
@@ -1859,7 +1866,7 @@ async function acceptPhoto(source){
   if(S.settings.aiMode==='auto' && S.draft?.blob) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#ai-run,#save-api,#toggle-plan,[data-aimode]');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-unwear],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#ai-run,#save-api,#toggle-plan,[data-aimode]');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
@@ -1927,7 +1934,11 @@ document.addEventListener('click',async e=>{
   if(g('data-tmem')){ S._todayMem=g('data-tmem'); return renderToday() }
 
   if(g('data-wear'))  return wearItem(g('data-wear'), S.wearDate||today());
-  if(g('data-wear2')){ await wearItem(g('data-wear2')); return closeSheet() }
+  if(g('data-wear2')){ const id=g('data-wear2'); await wearItem(id); return openItem(id) }
+  if(g('data-unwear')){
+    const [id,dt]=g('data-unwear').split('|');
+    await wearItem(id,dt); return openItem(id);
+  }
   if(g('data-item'))  return openItem(g('data-item'));
   if(g('data-member'))return openMemberForm(g('data-member'));
   if(t.id==='add-member') return openMemberForm(null);
@@ -2093,6 +2104,12 @@ document.addEventListener('click',async e=>{
 $('#scrim').addEventListener('click',closeSheet);
 
 document.addEventListener('change',async e=>{
+  if(e.target.id==='item-wear-date'){
+    const v=e.target.value, id=e.target.getAttribute('data-for');
+    if(!v||v>today()) return;
+    if(S.wears.some(w=>w.itemId===id&&w.date===v)){ toast(fmtMD(v)+'はすでに記録済みです'); return }
+    await wearItem(id,v); return openItem(id);
+  }
   if(e.target.id==='wear-date'){
     const v=e.target.value;
     if(v&&v<=today()){ S.wearDate = v===today()?null:v; renderToday() }
