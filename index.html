@@ -265,6 +265,20 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 .datebar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 12px}
 .datebar .chip{padding:0 15px}
 .datechip,.datebtn{position:relative;overflow:hidden;cursor:pointer}
+.homecard{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px 14px 14px;margin-top:2px}
+.homehead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
+.homehead b{font-size:20px;font-weight:700}
+.homehead span{font-size:12.5px;color:var(--ink2)}
+.shootbtn{margin-top:8px;min-height:58px;font-size:17px}
+.center{text-align:center}
+.homecard .datebar{margin:14px 0 12px}
+.stats.small div{padding:11px 6px}
+.stats.small b{font-size:18px}
+.outfit-photo{width:100%;max-height:44vh;object-fit:contain;border-radius:14px;background:#000;display:block;margin-bottom:10px}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 2px;flex-wrap:wrap}
+.sortsel{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);font-weight:700;margin-left:auto}
+.sortsel select{width:auto;min-height:44px;padding:0 36px 0 14px;border-radius:999px;font-size:14.5px;font-weight:600;
+  background:var(--surface2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235C7480' stroke-width='2' fill='none'/%3E%3C/svg%3E") no-repeat right 14px center}
 .datechip input,.datebtn input{position:absolute;inset:0;width:100%;height:100%;min-height:0;
   margin:0;padding:0;border:0;opacity:0;-webkit-appearance:none;appearance:none}
 .tile.worn{outline:3px solid var(--ok);outline-offset:-3px}
@@ -290,10 +304,9 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 
   <!-- ===== 今日 ===== -->
   <section class="view on" id="v-today">
-    <header class="top"><h1>今日</h1><span class="sub" id="today-date"></span></header>
-    <div class="stats" id="today-stats"></div>
-    <div class="sp"></div>
+    <header class="top"><h1>ホーム</h1><span class="sub" id="today-date"></span></header>
     <div id="today-body"></div>
+    <input type="file" id="outfit-file" accept="image/*" hidden>
   </section>
 
   <!-- ===== クローゼット ===== -->
@@ -301,7 +314,8 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
     <header class="top"><h1>クローゼット</h1><span class="sub" id="closet-count"></span></header>
     <div class="filters" id="f-member"></div>
     <div class="filters" id="f-cat"></div>
-    <div id="f-size"></div>
+    <div class="toolbar"><div id="f-size"></div>
+      <label class="sortsel">並び<select id="closet-sort" aria-label="並び順"></select></label></div>
     <div id="closet-body"></div>
   </section>
 
@@ -376,7 +390,7 @@ const MEMBER_COLORS = [
   {n:'レッド',  hex:'#B84B42'}, {n:'グレー',  hex:'#6B7B82'}
 ];
 const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
-const APP_VERSION = '0.6.1';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
+const APP_VERSION = '0.7.0';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
 const KID_SIZES = ['60','70','80','90','100','110','120','130','140','150','160'];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL'];
 const FREE_SIZE = 'F';         // フリーサイズ。数字ではないのでサイズアウト判定の対象外
@@ -1005,6 +1019,28 @@ async function backfillHashes(){
     if(h){ it.sig=h; await dbPut('items',it) }
   }
 }
+/* 並び順。IDは作成時刻から始まるので、IDで比べれば同じ日に登録した服も正しく並ぶ */
+const SORTS=[
+  ['new','登録が新しい順'],['old','登録が古い順'],['recent','最近着た順'],
+  ['idle','長く着ていない順'],['often','よく着る順'],['size','サイズ順'],['age','買った時期が古い順']];
+function sortItems(list,key){
+  const byId=(a,b)=>String(a.id).localeCompare(String(b.id));
+  const lw=i=>i.lastWorn||'';
+  const idle=i=>i.lastWorn||i.addedAt||'';
+  const bought=i=>i.purchaseDate||i.addedAt||'';
+  const sz=i=>{ const n=sizeNum(i.size); if(n!==null) return n;
+    const k=ADULT_SIZES.indexOf(String(i.size)); return k>=0 ? 1000+k : (String(i.size)===FREE_SIZE ? 1100 : 2000) };
+  const f={
+    new:   (a,b)=>byId(b,a),
+    old:   (a,b)=>byId(a,b),
+    recent:(a,b)=>lw(b).localeCompare(lw(a))||byId(b,a),
+    idle:  (a,b)=>idle(a).localeCompare(idle(b))||byId(a,b),
+    often: (a,b)=>(b.wearCount||0)-(a.wearCount||0)||byId(b,a),
+    size:  (a,b)=>sz(a)-sz(b)||byId(b,a),
+    age:   (a,b)=>bought(a).localeCompare(bought(b))||byId(a,b)
+  }[key] || ((a,b)=>byId(b,a));
+  return list.slice().sort(f);
+}
 function ownerBadge(it){
   if(S.fMember!=='all') return '';
   const m=memberOf(it.memberId); if(!m) return '';
@@ -1057,7 +1093,7 @@ function listingText(it){
    ルーティング
    ============================================================ */
 const TABS=[
-  {id:'today', n:'今日',       d:'M12 3v2M12 19v2M3 12h2M19 12h2M12 7a5 5 0 100 10 5 5 0 000-10z'},
+  {id:'today', n:'ホーム',     d:'M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-6h4v6'},
   {id:'closet',n:'クローゼット',d:'M4 4h16v16H4zM12 4v16M8 11h1M15 11h1'},
   {id:'add',   n:'登録',       d:'M12 5v14M5 12h14'},
   {id:'out',   n:'手放す',     d:'M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13'},
@@ -1095,14 +1131,7 @@ function render(){
 function renderToday(){
   const d=new Date();
   $('#today-date').textContent=`${d.getMonth()+1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）`;
-
   const act=S.items.filter(isActive);
-  const total=act.reduce((s,i)=>s+(Number(i.price)||0),0);
-  const wornToday=S.wears.filter(w=>w.date===today()).length;
-  $('#today-stats').innerHTML=`
-    <div><b class="num">${act.length}</b><span>登録した服</span></div>
-    <div><b class="num">${wornToday}</b><span>今日着た服</span></div>
-    <div><b class="num">${total?'¥'+Math.round(total/10000)+'万':'—'}</b><span>クローゼット総額</span></div>`;
 
   if(!S.members.length){
     $('#today-body').innerHTML=`
@@ -1123,39 +1152,147 @@ function renderToday(){
     return;
   }
 
-  let h='';
-
-  // 今日着たものを記録するショートカット
+  if(!memberOf(S._todayMem)) S._todayMem=S.members[0].id;
+  const m=memberOf(S._todayMem);
   const day=S.wearDate||today(), isToday=day===today();
   const wornOnDay=S.wears.filter(w=>w.date===day).length;
-  h+=`<h2 class="sec">${isToday?'今日':esc(fmtMD(day))}着た服を記録<span class="c">${wornOnDay}着</span></h2>`;
-  h+=`<div class="datebar">
-    ${[[0,'今日'],[1,'昨日'],[2,'おととい']].map(([n,lab])=>{
-      const v=ymd(new Date(Date.now()-n*86400000));
-      return `<button class="chip" data-wday="${v}" aria-pressed="${day===v}">${lab}</button>`;}).join('')}
-    ${(()=>{const custom=![0,1,2].some(n=>ymd(new Date(Date.now()-n*86400000))===day);
-      return `<label class="chip datechip" aria-pressed="${custom}">📅 ${custom?esc(fmtMD(day).replace(/（.）/,'')):'他の日'}
-        <input type="date" id="wear-date" value="${day}" max="${today()}" aria-label="日付を選ぶ"></label>`;})()}
-  </div>`;
-  h+= isToday
-    ? `<div class="card tiny muted">タップするだけで着用回数と最終着用日が更新されます。つけ忘れた日は、上で日付を選べば後から記録できます。</div>`
-    : `<button class="note amber" data-wday="${today()}" style="display:block;width:100%;text-align:left">${esc(fmtMD(day))}の記録を編集中です。タップで今日に戻ります</button>`;
-  h+=`<div class="filters" id="today-mem"></div><div class="grid" id="today-grid"></div>`;
+  const ago=n=>ymd(new Date(Date.now()-n*86400000));
+  const custom=![0,1,2].some(n=>ago(n)===day);
 
-  // サイズアウト予測：子どもは全員カードを出し、出せないときは理由を書く
+  let h='';
+
+  // ① 毎日使う：着た服を記録
+  h+=`<div class="homecard">
+    <div class="homehead"><b>${isToday?'今日の服':esc(fmtMD(day))+'の服'}</b><span class="num">${wornOnDay}着 記録済み</span></div>
+    <div class="filters" id="today-mem">${S.members.map(x=>
+      `<button class="chip" data-tmem="${x.id}" aria-pressed="${x.id===m.id}"><span class="mdot" style="background:${memberHex(x)}"></span>${esc(x.name)}</button>`).join('')}</div>
+    ${S.settings.aiMode!=='off'?`
+      <button class="btn wide shootbtn" id="outfit-shot">📷 着ている服を撮って記録</button>
+      <div class="tiny muted center" style="margin-top:6px">${esc(m.name)}さんの服から探します・${aiRemainLabel()}</div>`:''}
+    <div class="datebar">
+      ${[[0,'今日'],[1,'昨日'],[2,'おととい']].map(([n,lab])=>
+        `<button class="chip" data-wday="${ago(n)}" aria-pressed="${day===ago(n)}">${lab}</button>`).join('')}
+      <label class="chip datechip" aria-pressed="${custom}">📅 ${custom?esc(fmtMD(day).replace(/（.）/,'')):'他の日'}
+        <input type="date" id="wear-date" value="${day}" max="${today()}" aria-label="日付を選ぶ"></label>
+    </div>
+    ${isToday?'':`<button class="note amber" data-wday="${today()}" style="display:block;width:100%;text-align:left;margin-bottom:10px">${esc(fmtMD(day))}の記録を編集中です。タップで今日に戻ります</button>`}
+    <div class="grid" id="today-grid"></div>
+    <div class="tiny muted center" style="margin-top:10px">服をタップで記録・もう一度タップで取り消し</div>
+  </div>`;
+
+  // ② 参考：サイズアウト予測
   const kids=S.members.filter(isKidMember);
   if(kids.length){
-    h+=`<h2 class="sec">サイズアウト予測</h2>`;
+    h+=`<h2 class="sec">サイズアウト予測<span class="c">参考</span></h2>`;
     h+=kids.map(forecastCard).join('');
   }
-  $('#today-body').innerHTML=h;
 
-  // メンバーフィルタ（今日の記録用）
-  if(!S._todayMem) S._todayMem=S.members[0].id;
-  $('#today-mem').innerHTML=S.members.map(m=>
-    `<button class="chip" data-tmem="${m.id}" aria-pressed="${S._todayMem===m.id}"><span class="mdot" style="background:${memberHex(m)}"></span>${esc(m.name)}</button>`).join('');
+  // ③ まとめ
+  const priced=act.filter(i=>Number(i.price)>0);
+  const total=priced.reduce((t,i)=>t+Number(i.price),0);
+  const totalText=!total?'—':total<100000?'¥'+total.toLocaleString('ja-JP'):'¥'+Math.round(total/10000)+'万';
+  const monthWears=S.wears.filter(w=>String(w.date).startsWith(monthKey())).length;
+  h+=`<h2 class="sec">まとめ</h2>
+    <div class="stats small">
+      <div><b class="num">${act.length}</b><span>登録した服</span></div>
+      <div><b class="num">${monthWears}</b><span>今月着た回数</span></div>
+      <div><b class="num">${totalText}</b><span>総額${priced.length&&priced.length<act.length?`（${priced.length}着分）`:''}</span></div>
+    </div>`;
+
+  $('#today-body').innerHTML=h;
   drawTodayGrid();
 }
+
+/* ---------- 写真で今日の服を記録 ---------- */
+async function outfitDataURL(file){
+  const bmp=await loadBitmap(file);
+  const w=bmp.width||bmp.naturalWidth, h=bmp.height||bmp.naturalHeight;
+  const sc=Math.min(1,1024/Math.max(w,h));
+  const cv=document.createElement('canvas'); cv.width=Math.round(w*sc); cv.height=Math.round(h*sc);
+  cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);
+  if(bmp.close) bmp.close();
+  return cv.toDataURL('image/jpeg',0.8);
+}
+async function outfitIdentify(file){
+  const mid=S._todayMem, m=memberOf(mid);
+  const day=S.wearDate||today();
+  const cands=S.items.filter(i=>isActive(i)&&i.memberId===mid);
+  if(!cands.length){ toast(`${m?.name||''}さんの服がまだ登録されていません`); return }
+  if(aiRemaining()<=0){ toast('今月のAI判別を使い切りました'); return }
+
+  openSheet(`<div class="shead"><h3>写真から探しています</h3><button class="x" data-close>閉じる</button></div>
+    <div class="empty"><span class="g">🔍</span><p>${esc(m.name)}さんの${cands.length}着の中から探しています…</p></div>`);
+  const tok={}; S._outfitTok=tok;
+
+  let image;
+  try{ image=await outfitDataURL(file) }catch(e){ closeSheet(); toast('写真を読み込めませんでした'); return }
+  try{
+    const candidates=cands.map(i=>({
+      id:i.id, category:catOf(i.category).n, color:i.color||'',
+      size:i.size?sizeLabel(i.size):'',
+      // Workerは brand 欄をそのまま候補の説明に使う。柄とキャラクター柄の有無を足して見分けやすくする
+      brand:[i.pattern&&i.pattern!=='無地'?i.pattern:'', i.hasCharacterPrint?'キャラクター柄':'', i.brand||''].filter(Boolean).join(' ')
+    }));
+    const res=await fetch(API_BASE+'/identify',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({image,candidates})
+    });
+    const json=await res.json().catch(()=>null);
+    if(!res.ok||!json?.ok) throw new Error(json?.error||('HTTP '+res.status));
+    const u=usageNow(); u.count++; saveUsage();
+    if(S._outfitTok!==tok) return;               // 待っている間に閉じられた
+    const ids=new Set(cands.map(i=>i.id));
+    const found=(json.result?.worn||[]).filter(w=>ids.has(w.id))
+      .sort((a,b)=>(b.confidence||0)-(a.confidence||0));
+    S._outfit={day, mid, photo:image, found,
+      unmatched:(json.result?.unmatched||[]).slice(0,4),
+      pick:new Set(found.filter(w=>(w.confidence||0)>=0.6).map(w=>w.id))};
+    renderOutfit();
+  }catch(err){
+    if(S._outfitTok===tok){ closeSheet(); toast('判別できませんでした') }
+  }
+}
+function renderOutfit(){
+  const o=S._outfit; if(!o) return;
+  const m=memberOf(o.mid);
+  const tiles=o.found.map(w=>{
+    const it=S.items.find(i=>i.id===w.id); if(!it) return '';
+    const on=o.pick.has(it.id);
+    const already=S.wears.some(x=>x.itemId===it.id&&x.date===o.day);
+    return `<button class="tile ${on?'worn':''}" data-pick="${it.id}">
+      <div class="ph" data-photo="${it.photoId||''}">${catOf(it.category).g}</div>
+      ${on?'<span class="flag ok"></span>':''}
+      <span class="tag">${already?'記録済み':'確度 '+Math.round((w.confidence||0)*100)+'%'}</span></button>`;
+  }).join('');
+  openSheet(`
+    <div class="shead"><h3>この服を着ていますか？</h3><button class="x" data-close>閉じる</button></div>
+    <img class="outfit-photo" src="${o.photo}" alt="">
+    <p class="tiny muted" style="margin:0 0 10px">${esc(m?.name||'')}さんの服から見つけました。タップで選択を切り替えられます（${esc(fmtMD(o.day))}の記録）。</p>
+    ${o.found.length?`<div class="grid" style="margin-top:0">${tiles}</div>`
+      :`<div class="note amber">登録済みの服の中に、当てはまるものが見つかりませんでした。</div>`}
+    ${o.unmatched.length?`<div class="note indigo tiny" style="margin-top:12px">未登録かもしれない服：${o.unmatched.map(esc).join('、')}</div>`:''}
+    <div class="act col">
+      <button class="btn wide" data-outfitsave ${o.pick.size?'':'disabled'}>選んだ${o.pick.size}着を記録する</button>
+      <button class="btn ghost wide" data-close>やめる</button>
+    </div><div class="sp"></div>`);
+  hydratePhotos($('#sheet-inner'));
+}
+/* まとめて記録。1着ずつ再描画しないよう、書き込んでから数え直す */
+async function addWears(ids,date){
+  for(const id of ids){
+    if(S.wears.some(w=>w.itemId===id&&w.date===date)) continue;
+    await dbPut('wears',{id:uid(),itemId:id,date});
+  }
+  await reload();
+  for(const id of ids){
+    const it=S.items.find(i=>i.id===id); if(!it) continue;
+    const ds=S.wears.filter(w=>w.itemId===id).map(w=>w.date).sort();
+    it.wearCount=ds.length; it.lastWorn=ds.length?ds[ds.length-1]:null;
+    await dbPut('items',it);
+  }
+  await reload(); render();
+}
+
 async function drawTodayGrid(){
   const g=$('#today-grid'); if(!g) return;
   const day=S.wearDate||today();
@@ -1193,7 +1330,9 @@ function renderCloset(){
   if(S.fSize!=null)     list=list.filter(i=>sizeNum(i.size)===S.fSize);
   $('#f-size').innerHTML = S.fSize!=null
     ? `<button class="chip onfilter" data-fsizeclear>${S.fSize}cm だけを表示中　✕</button>` : '';
-  list.sort((a,b)=>(b.addedAt||'').localeCompare(a.addedAt||''));
+  list=sortItems(list, S.settings.closetSort||'new');
+  $('#closet-sort').innerHTML=SORTS.map(([k,n])=>
+    `<option value="${k}" ${(S.settings.closetSort||'new')===k?'selected':''}>${n}</option>`).join('');
 
   if(!list.length){
     $('#closet-body').innerHTML=`<div class="empty"><span class="g">🧺</span><p>条件に合う服がありません。</p>
@@ -1484,6 +1623,7 @@ function openSheet(html){
   document.body.style.overflow='hidden';
 }
 function closeSheet(){
+  S._outfitTok=null;
   $('#sheet').classList.remove('on'); $('#scrim').classList.remove('on');
   document.body.style.overflow='';
 }
@@ -1866,7 +2006,7 @@ async function acceptPhoto(source){
   if(S.settings.aiMode==='auto' && S.draft?.blob) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-unwear],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#ai-run,#save-api,#toggle-plan,[data-aimode]');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#ai-run,#outfit-shot,#save-api,#toggle-plan,[data-aimode]');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
@@ -1959,6 +2099,20 @@ document.addEventListener('click',async e=>{
   if(t.id==='cam-close') return closeCamera();
   if(t.id==='cam-shoot') return shootCamera();
   if(t.id==='ai-run') return aiAnalyze();
+  if(t.id==='outfit-shot') return $('#outfit-file').click();
+  if(g('data-pick')){
+    const id=g('data-pick'), pk=S._outfit?.pick; if(!pk) return;
+    pk.has(id)?pk.delete(id):pk.add(id);
+    return renderOutfit();
+  }
+  if(t.hasAttribute('data-outfitsave')){
+    const o=S._outfit; if(!o||!o.pick.size) return;
+    const n=o.pick.size;
+    await addWears([...o.pick], o.day);
+    S._outfit=null; closeSheet();
+    toast(`${n}着を記録しました`);
+    return;
+  }
   if(g('data-aimode')){
     S.settings.aiMode=g('data-aimode'); saveSettings(); renderSet(); return;
   }
@@ -2104,6 +2258,14 @@ document.addEventListener('click',async e=>{
 $('#scrim').addEventListener('click',closeSheet);
 
 document.addEventListener('change',async e=>{
+  if(e.target.id==='outfit-file'){
+    const f=e.target.files?.[0]; e.target.value='';
+    if(f) await outfitIdentify(f);
+    return;
+  }
+  if(e.target.id==='closet-sort'){
+    S.settings.closetSort=e.target.value; saveSettings(); renderCloset(); return;
+  }
   if(e.target.id==='item-wear-date'){
     const v=e.target.value, id=e.target.getAttribute('data-for');
     if(!v||v>today()) return;
