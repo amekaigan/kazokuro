@@ -236,6 +236,8 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 .fc-row em{font-style:normal;font-size:12.5px;font-weight:700}
 .fc-row em.amber{color:var(--amber)}
 .fc-row em.indigo{color:var(--ink2);font-weight:500}
+.airow{display:flex;align-items:center;gap:12px;margin-top:12px}
+.airow .btn{flex:0 0 auto}
 .row .th.av{color:#fff;font-size:20px;font-weight:700;border:none;line-height:1}
 .chip .mdot{display:inline-block;width:11px;height:11px;border-radius:6px;margin-right:8px;flex:0 0 auto}
 .chip[aria-pressed="true"] .mdot{background:#fff!important}
@@ -283,7 +285,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 
   <!-- ===== 設定 ===== -->
   <section class="view" id="v-set">
-    <header class="top"><h1>設定</h1><span class="sub">v0.3</span></header>
+    <header class="top"><h1>設定</h1><span class="sub">v0.4</span></header>
     <div id="set-body"></div>
   </section>
 
@@ -424,14 +426,33 @@ const S = {
   fMember:'all', fCat:'all',
   draft:null,          // 登録中の1着
   lastUsed:{memberId:null,category:null},
-  settings:{normalize:true}
+  settings:{normalize:true, aiMode:'button', apiBase:'', aiFreeLimit:30, plan:'free'},
+  usage:{month:'', count:0}
 };
 try{
   const raw=localStorage.getItem('kazokuro-settings');
   if(raw) Object.assign(S.settings,JSON.parse(raw));
+  const u=localStorage.getItem('kazokuro-usage');
+  if(u) Object.assign(S.usage,JSON.parse(u));
 }catch(e){}
 function saveSettings(){
   try{ localStorage.setItem('kazokuro-settings',JSON.stringify(S.settings)) }catch(e){}
+}
+function monthKey(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0') }
+function usageNow(){
+  if(S.usage.month!==monthKey()) S.usage={month:monthKey(),count:0};
+  return S.usage;
+}
+function saveUsage(){
+  try{ localStorage.setItem('kazokuro-usage',JSON.stringify(S.usage)) }catch(e){}
+}
+function aiUnlimited(){ return S.settings.plan!=='free' }
+function aiRemaining(){
+  if(aiUnlimited()) return Infinity;
+  return Math.max(0, S.settings.aiFreeLimit - usageNow().count);
+}
+function aiRemainLabel(){
+  return aiUnlimited() ? '無制限' : `今月あと${aiRemaining()}回`;
 }
 const urlCache=new Map();
 
@@ -981,6 +1002,17 @@ function renderAdd(){
     <input type="file" id="shot" accept="image/*" hidden>
     ${d?.photoURL?'<div class="act"><button class="btn sub sm" id="shot-redo">撮り直す</button><button class="btn ghost sm" id="shot-pick">写真から選ぶ</button></div>'
                  :'<div class="act"><button class="btn ghost" id="shot-pick">カメラロールの写真から選ぶ</button></div>'}
+    ${d?.photoURL&&S.settings.aiMode!=='off'?`
+      <div class="airow">
+        <button class="btn ${d.aiDone?'sub':''} sm" id="ai-run" ${d.aiBusy?'disabled':''}>
+          ${d.aiBusy?'判別中…':d.aiDone?'もう一度AIで判別':'✨ AIで判別'}
+        </button>
+        <span class="tiny muted">${aiRemainLabel()}</span>
+      </div>
+      ${d.aiDone?`<div class="note ok tiny">AIが埋めました${d.pattern?`（柄：${esc(d.pattern)}）`:''}。違っていれば下でタップして直せます。${d.hasCharacterPrint?'<br>キャラクタープリントを検出しました。':''}</div>`:''}
+      ${d.aiError==='limit'?'<div class="note amber tiny">今月の無料回数を使い切りました。設定から切り替えるか、来月まで手動で入力してください。</div>':
+        d.aiError?`<div class="note amber tiny">判別できませんでした：${esc(d.aiError)}</div>`:''}
+    `:''}
 
     <label class="f">だれの服</label>
     <div class="chips" id="d-mem">${S.members.map(m=>
@@ -1083,6 +1115,26 @@ function renderSet(){
   }
   h+=`<div class="act"><button class="btn ghost wide" id="add-member">家族を追加する</button></div></div>`;
 
+  h+=`<h2 class="sec">AIで判別</h2><div class="card">
+    <p class="tiny muted" style="margin:0 0 12px">写真から服の種類・色・柄・季節を判別します。結果はいつでも手で直せます。</p>
+    <label class="f">いつ判別するか</label>
+    <div class="chips" id="ai-mode">
+      ${[['auto','撮ったら自動'],['button','ボタンを押したとき'],['off','使わない']].map(([v,n])=>
+        `<button class="chip" data-aimode="${v}" aria-pressed="${S.settings.aiMode===v}">${n}</button>`).join('')}
+    </div>
+    <label class="f" for="api-base">AIサーバーのURL</label>
+    <input type="text" id="api-base" value="${esc(S.settings.apiBase||'')}" placeholder="https://kazokuro-api.〇〇.workers.dev">
+    <div class="act"><button class="btn sub sm" id="save-api">保存して接続を確認</button></div>
+    <div class="hr"></div>
+    <div class="fc-row"><b>${aiUnlimited()?'無制限':usageNow().count+' / '+S.settings.aiFreeLimit}</b>
+      <span>今月の判別回数</span>
+      <em class="${aiRemaining()<=0?'amber':'indigo'}">${aiRemainLabel()}</em></div>
+    <div class="act">
+      <button class="btn ${aiUnlimited()?'':'ghost'} wide" id="toggle-plan">${aiUnlimited()?'現在：無制限プラン':'無料プラン（月'+S.settings.aiFreeLimit+'回まで）'}</button>
+    </div>
+    <p class="tiny muted" style="margin:10px 0 0">プラン切替は動作確認用です。回数は端末内で数えているだけなので、公開時はサーバー側で管理します。</p>
+  </div>`;
+
   h+=`<h2 class="sec">写真の仕上げ</h2><div class="card">
     <p class="tiny muted" style="margin:0 0 12px">背景を白に近づけ、服を中央に同じ大きさで切り出します。明るさと色かぶりも揃えるので、一覧が整って見えます。うまく切り出せない写真があるときは切ってください。</p>
     <div class="act"><button class="btn ${S.settings.normalize?'':'ghost'} wide" id="toggle-norm">${S.settings.normalize?'きれいに整える：オン':'きれいに整える：オフ'}</button></div>
@@ -1099,7 +1151,7 @@ function renderSet(){
   </div>`;
 
   h+=`<h2 class="sec">このアプリについて</h2><div class="card tiny muted">
-    家族ローゼット（かぞクロ）v0.3<br>
+    家族ローゼット（かぞクロ）v0.4<br>
     子どものサイズアウトを、手遅れになる前に教えるアプリです。<br><br>
     身長の記録が2回以上あると、その子の実際の成長ペースで予測します。<br>
     コーデ提案は、服のデータが貯まってから追加する予定です。
@@ -1307,6 +1359,7 @@ async function saveDraft(keepGoing){
     price:d.price?Number(d.price):null,
     purchaseDate:d.purchaseDate||null,
     season:d.season||[], status:'active',
+    pattern:d.pattern||null, hasCharacterPrint:!!d.hasCharacterPrint,
     wearCount:0, lastWorn:null, addedAt:today()
   };
   await dbPut('items',it);
@@ -1357,6 +1410,72 @@ async function importData(file){
 }
 
 /* ============================================================
+   AI判別（Worker経由）
+   ============================================================ */
+
+/* 解析用に小さく作り直す。900pxのまま送ると画像トークンが3倍かかる */
+async function analysisDataURL(blob){
+  const bmp=await loadBitmap(blob);
+  const s=512;
+  const cv=document.createElement('canvas'); cv.width=s; cv.height=s;
+  cv.getContext('2d').drawImage(bmp,0,0,s,s);
+  if(bmp.close) bmp.close();
+  return cv.toDataURL('image/jpeg',0.8);
+}
+
+function applyAnalysis(r){
+  const d=S.draft||{};
+  const patch={aiDone:true};
+  if(r.category && CATS.some(c=>c.id===r.category)) patch.category=r.category;
+  if(r.color && COLORS.some(c=>c.n===r.color)){ patch.color=r.color; patch.autoColor=true }
+  if(Array.isArray(r.season)){
+    const ss=r.season.filter(s=>SEASONS.includes(s));
+    if(ss.length) patch.season=ss;
+  }
+  patch.pattern = r.pattern || null;
+  patch.hasCharacterPrint = !!r.hasCharacterPrint;
+  patch.aiConfidence = typeof r.confidence==='number' ? r.confidence : null;
+  S.draft={...d,...patch};
+}
+
+async function aiAnalyze(){
+  const d=S.draft;
+  if(!d?.blob){ toast('先に写真を撮ってください'); return }
+
+  const base=(S.settings.apiBase||'').trim().replace(/\/+$/,'');
+  if(!base){ toast('設定でAPIのURLを入れてください'); go('set'); return }
+
+  if(aiRemaining()<=0){
+    toast('今月のAI判別を使い切りました');
+    S.draft={...d,aiError:'limit'}; renderAdd(); return;
+  }
+
+  S.draft={...d,aiBusy:true,aiError:null}; renderAdd();
+  try{
+    const image=await analysisDataURL(d.blob);
+    const res=await fetch(base+'/analyze',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({image})
+    });
+    const json=await res.json().catch(()=>null);
+    if(!res.ok||!json?.ok) throw new Error(json?.error||('HTTP '+res.status));
+
+    // 成功したときだけ回数を消費する
+    const u=usageNow(); u.count++; saveUsage();
+
+    S.draft={...S.draft,aiBusy:false};
+    applyAnalysis(json.result);
+    renderAdd();
+    toast('AIが判別しました');
+  }catch(err){
+    S.draft={...S.draft,aiBusy:false,aiError:String(err.message||err)};
+    renderAdd();
+    toast('判別できませんでした');
+  }
+}
+
+/* ============================================================
    カメラ
    ============================================================ */
 let camStream=null;
@@ -1400,12 +1519,14 @@ async function acceptPhoto(source){
     if(S.draft?.photoURL) URL.revokeObjectURL(S.draft.photoURL);
     S.draft={...(S.draft||{}),blob,photoURL:URL.createObjectURL(blob),
       color:S.draft?.autoColor===false?S.draft.color:(color||S.draft?.color),
-      autoColor:S.draft?.autoColor===false?false:!!color};
+      autoColor:S.draft?.autoColor===false?false:!!color,
+      aiDone:false,aiError:null,pattern:null,hasCharacterPrint:false};
   }catch(err){ toast('写真を読み込めませんでした') }
   if(S.view!=='add') go('add'); else renderAdd();
+  if(S.settings.aiMode==='auto' && S.draft?.blob && S.settings.apiBase) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#toggle-norm');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#toggle-norm,#ai-run,#save-api,#toggle-plan,[data-aimode]');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
@@ -1438,6 +1559,25 @@ document.addEventListener('click',async e=>{
   if(t.id==='shot-pick'||t.id==='cam-pick'){ closeCamera(); return $('#shot').click() }
   if(t.id==='cam-close') return closeCamera();
   if(t.id==='cam-shoot') return shootCamera();
+  if(t.id==='ai-run') return aiAnalyze();
+  if(g('data-aimode')){
+    S.settings.aiMode=g('data-aimode'); saveSettings(); renderSet(); return;
+  }
+  if(t.id==='toggle-plan'){
+    S.settings.plan = aiUnlimited() ? 'free' : 'unlimited';
+    saveSettings(); renderSet(); return;
+  }
+  if(t.id==='save-api'){
+    const v=($('#api-base').value||'').trim().replace(/\/+$/,'');
+    S.settings.apiBase=v; saveSettings();
+    if(!v){ toast('URLを消しました'); return renderSet() }
+    try{
+      const r=await fetch(v+'/health');
+      const j=await r.json();
+      toast(j?.ok?'接続できました':'応答が想定と違います');
+    }catch(e){ toast('つながりませんでした') }
+    renderSet(); return;
+  }
   if(t.id==='toggle-norm'){
     S.settings.normalize=!S.settings.normalize; saveSettings(); renderSet();
     toast(S.settings.normalize?'きれいに整えます':'撮ったままを使います');
