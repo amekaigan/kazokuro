@@ -237,7 +237,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 .fc-row em.amber{color:var(--amber)}
 .fc-row em.indigo{color:var(--ink2);font-weight:500}
 .airow{display:flex;align-items:center;gap:12px;margin-top:12px}
-.tile .owner{position:absolute;left:6px;top:6px;width:26px;height:26px;border-radius:13px;
+.tile .owner{position:absolute;left:6px;top:6px;min-width:26px;height:26px;padding:0 6px;border-radius:13px;
   color:#fff;font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center;
   box-shadow:0 0 0 2px var(--surface)}
 .tile .qty{position:absolute;right:6px;bottom:6px;padding:3px 8px;border-radius:7px;
@@ -262,6 +262,11 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:13px;margin-left:6px;font-
 .duppair figcaption{font-size:12px;color:var(--ink2);text-align:center;margin-top:5px}
 .act.col{flex-direction:column}
 .act.col .btn{min-width:0}
+.datebar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 12px}
+.datebar .datein{width:auto;min-height:48px;border-radius:999px;padding:0 16px;font-weight:600;font-size:15px}
+.tile.worn{outline:3px solid var(--ok);outline-offset:-3px}
+.agebar{margin:12px 2px 0;font-size:15px;font-weight:700;color:var(--ink)}
+.linkish{color:var(--indigo);text-decoration:underline;font-weight:700;padding:0;min-height:0}
 .airow .btn{flex:0 0 auto}
 .row .th.av{color:#fff;font-size:20px;font-weight:700;border:none;line-height:1}
 .chip .mdot{display:inline-block;width:11px;height:11px;border-radius:6px;margin-right:8px;flex:0 0 auto}
@@ -368,7 +373,7 @@ const MEMBER_COLORS = [
   {n:'レッド',  hex:'#B84B42'}, {n:'グレー',  hex:'#6B7B82'}
 ];
 const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
-const APP_VERSION = '0.5.0';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
+const APP_VERSION = '0.6.0';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
 const KID_SIZES = ['60','70','80','90','100','110','120','130','140','150','160'];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL'];
 const FREE_SIZE = 'F';         // フリーサイズ。数字ではないのでサイズアウト判定の対象外
@@ -398,7 +403,7 @@ const GROWTH_BY_AGE = [
 /* ============================================================
    IndexedDB
    ============================================================ */
-const DB_NAME='kazoku-closet', DB_VER=2;
+const DB_NAME='kazoku-closet', DB_VER=3;
 let db=null;
 
 function openDB(){
@@ -416,6 +421,7 @@ function openDB(){
         s.createIndex('itemId','itemId',{unique:false});
       }
       if(!d.objectStoreNames.contains('photos')) d.createObjectStore('photos',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('thumbs')) d.createObjectStore('thumbs',{keyPath:'id'});
       if(!d.objectStoreNames.contains('growth')){
         const s=d.createObjectStore('growth',{keyPath:'id'});
         s.createIndex('memberId','memberId',{unique:false});
@@ -468,7 +474,7 @@ const S = {
   fMember:'all', fCat:'all', fSize:null,
   draft:null,          // 登録中の1着
   lastUsed:{memberId:null,category:null},
-  settings:{normalize:true, aiMode:'button', aiFreeLimit:30, plan:'free'},
+  settings:{finish:'soft', aiMode:'button', aiFreeLimit:30, plan:'free'},
   usage:{month:'', count:0}
 };
 try{
@@ -498,13 +504,41 @@ function aiRemainLabel(){
 }
 const urlCache=new Map();
 
+/* 大きい写真（詳細・比較用）。メモリを食うので直近12枚だけ持つ */
 async function photoURL(id){
   if(!id) return null;
-  if(urlCache.has(id)) return urlCache.get(id);
+  if(urlCache.has(id)){ const u=urlCache.get(id); urlCache.delete(id); urlCache.set(id,u); return u }
   const p=await dbGet('photos',id);
   if(!p) return null;
   const u=URL.createObjectURL(p.blob);
   urlCache.set(id,u);
+  while(urlCache.size>12){ const [k,v]=urlCache.entries().next().value; URL.revokeObjectURL(v); urlCache.delete(k) }
+  return u;
+}
+/* 一覧用の小さい写真（240px）。900pxの写真を一覧に並べると1枚約3MBのメモリを使い、
+   200着で約650MBになってSafariが落ちる。240pxなら1枚約0.2MB */
+const thumbCache=new Map();
+const THUMB=240;
+async function makeThumb(blob){
+  const bmp=await loadBitmap(blob);
+  const w=bmp.width||bmp.naturalWidth, h=bmp.height||bmp.naturalHeight, sq=Math.min(w,h);
+  const cv=document.createElement('canvas'); cv.width=THUMB; cv.height=THUMB;
+  const cx=cv.getContext('2d'); cx.imageSmoothingEnabled=true; cx.imageSmoothingQuality='high';
+  cx.drawImage(bmp,(w-sq)/2,(h-sq)/2,sq,sq,0,0,THUMB,THUMB);
+  if(bmp.close) bmp.close();
+  return new Promise(r=>cv.toBlob(r,'image/jpeg',0.75));
+}
+/* なければその場で作って保存する。古いデータも、表示されたものから順に作られていく */
+async function thumbURL(id){
+  if(!id) return null;
+  if(thumbCache.has(id)) return thumbCache.get(id);
+  let t=await dbGet('thumbs',id);
+  if(!t){
+    const p=await dbGet('photos',id); if(!p) return null;
+    try{ t={id,blob:await makeThumb(p.blob)}; await dbPut('thumbs',t) }catch(e){ return null }
+  }
+  const u=URL.createObjectURL(t.blob);
+  thumbCache.set(id,u);
   return u;
 }
 async function reload(){
@@ -521,7 +555,57 @@ async function reload(){
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const today=()=>new Date().toISOString().slice(0,10);
+/* 日付は端末の現地時間で扱う。toISOString() は世界標準時なので、日本では朝9時まで前日になってしまう */
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const today=()=>ymd(new Date());
+function monthsAgo(n){ const d=new Date(); d.setMonth(d.getMonth()-n); return ymd(d) }
+function fmtMD(s){ const d=new Date(s+'T00:00:00'); return `${d.getMonth()+1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）` }
+function fmtYM(s){ const d=new Date(s+'T00:00:00'); return `${d.getFullYear()}年${d.getMonth()+1}月` }
+/* 一覧用の短い表記：今日 / 昨日 / N日前 / Nヶ月前 / N年前 */
+function agoLabel(s){
+  const d=daysSince(s); if(d===null) return '';
+  if(d<=0) return '今日';
+  if(d===1) return '昨日';
+  if(d<30)  return d+'日前';
+  if(d<365) return Math.min(11,Math.floor(d/30))+'ヶ月前';
+  return Math.floor(d/365)+'年前';
+}
+/* 経過期間：「2年5ヶ月」「5ヶ月」「12日」 */
+function elapsed(s){
+  const d=daysSince(s); if(d===null) return '';
+  if(d<31) return d<=0?'0日':d+'日';
+  const b=new Date(s+'T00:00:00'), n=new Date();
+  let m=(n.getFullYear()-b.getFullYear())*12+(n.getMonth()-b.getMonth());
+  if(n.getDate()<b.getDate()) m--;
+  m=Math.max(1,m);
+  const y=Math.floor(m/12), r=m%12;
+  return (y?y+'年':'')+(r?r+'ヶ月':'');
+}
+/* 買った時期。正確な日付が分からない服のために「だいたい」で選べるようにする */
+const BUY_BUCKETS=[['m0','1ヶ月以内',0],['m3','半年以内',3],['y1','1年前くらい',12],['y2','2年前くらい',24],['y3','3年以上前',36]];
+function purchaseLabel(it){
+  if(!it.purchaseDate) return null;
+  if(it.purchaseApprox){
+    const b=BUY_BUCKETS.find(x=>x[0]===it.buyBucket);
+    return b ? b[1] : '約'+elapsed(it.purchaseDate)+'前';
+  }
+  const dd=daysSince(it.purchaseDate);
+  return `${fmtYM(it.purchaseDate)}（${dd<31?agoLabel(it.purchaseDate):elapsed(it.purchaseDate)+'前'}）`;
+}
+function buyChips(attr,cur){
+  return `<div class="chips">${BUY_BUCKETS.map(([k,n])=>
+    `<button class="chip" ${attr}="${k}" aria-pressed="${cur===k}">${n}</button>`).join('')}</div>`;
+}
+function ageLine(it){
+  const parts=[];
+  const base=it.purchaseDate||it.addedAt, isBuy=!!it.purchaseDate;
+  if(base){
+    if(daysSince(base)<=0) parts.push(isBuy?'今日買った服':'今日登録した服');
+    else parts.push(`${isBuy?'購入':'登録'}から${isBuy&&it.purchaseApprox?'約':''}${elapsed(base)}`);
+  }
+  parts.push(it.wearCount?`${it.wearCount}回着用`:'まだ着ていない');
+  return parts.join('・');
+}
 function daysSince(d){ if(!d) return null; return Math.floor((Date.now()-new Date(d+'T00:00:00').getTime())/86400000) }
 function yen(n){ return n==null||n===''?'—':'¥'+Number(n).toLocaleString('ja-JP') }
 function catOf(id){ return CATS.find(c=>c.id===id)||CATS[7] }
@@ -588,7 +672,13 @@ function subjectBox(cx,w,h,bg){
 }
 
 /* 背景を白に寄せ、服を中央に同じ大きさで切り出す */
-function normalize(work,wcx,w,h){
+/* 仕上げの強さ。旧設定（normalize:true/false）からも引き継ぐ */
+function finishLevel(){
+  const f=S.settings.finish;
+  if(f==='strong'||f==='soft'||f==='off') return f;
+  return S.settings.normalize===false ? 'off' : 'soft';
+}
+function normalize(work,wcx,w,h,level='soft'){
   const bg=sampleEdge(wcx,w,h)||[235,235,235];
   const box=subjectBox(wcx,w,h,bg);
   let sx,sy,ss;
@@ -608,14 +698,22 @@ function normalize(work,wcx,w,h){
   // 背景が明るいときだけ、そこを白の基準にして色かぶりと露出を補正する
   const lum=0.299*bg[0]+0.587*bg[1]+0.114*bg[2];
   if(lum>85){
-    const t=246;
-    const gain=[t/Math.max(1,bg[0]),t/Math.max(1,bg[1]),t/Math.max(1,bg[2])]
-      .map(g=>Math.max(0.75,Math.min(1.9,g)));
+    // ひかえめ：持ち上げは1.3倍まで・色かぶり補正は半分。しっかり：以前に近い強さ
+    const P = level==='strong' ? {t:262,max:1.9,cast:1} : {t:250,max:1.3,cast:0.5};
+    const lg=P.t/Math.max(1,lum);
+    const gain=[bg[0],bg[1],bg[2]].map(c=>{
+      const g=lg*(1-P.cast)+(P.t/Math.max(1,c))*P.cast;
+      return Math.max(0.8,Math.min(P.max,g));
+    });
+    // 明るい部分は頭打ちにせず寝かせる。白い服の陰影が残る
+    const KNEE=225, R=255-KNEE;
+    const lut=new Uint8ClampedArray(768);
+    for(let v=0;v<768;v++) lut[v]= v<=KNEE ? v : KNEE+R*(1-Math.exp(-(v-KNEE)/R));
     const im=ocx.getImageData(0,0,OUT_SIZE,OUT_SIZE), od=im.data;
     for(let i=0;i<od.length;i+=4){
-      od[i]  =Math.min(255,od[i]  *gain[0]);
-      od[i+1]=Math.min(255,od[i+1]*gain[1]);
-      od[i+2]=Math.min(255,od[i+2]*gain[2]);
+      od[i]  =lut[Math.min(767,od[i]  *gain[0]|0)];
+      od[i+1]=lut[Math.min(767,od[i+1]*gain[1]|0)];
+      od[i+2]=lut[Math.min(767,od[i+2]*gain[2]|0)];
     }
     ocx.putImageData(im,0,0);
   }
@@ -645,7 +743,7 @@ async function processPhoto(source){
   wcx.drawImage(src,0,0,w,h);
 
   const color=guessColor(wcx,w,h);
-  const out=S.settings.normalize ? normalize(work,wcx,w,h) : plainSquare(work,w,h);
+  const out=finishLevel()==='off' ? plainSquare(work,w,h) : normalize(work,wcx,w,h,finishLevel());
   const blob=await new Promise(r=>out.toBlob(r,'image/jpeg',0.78));
   if(!isCanvas && src.close) src.close();
   return {blob,color};
@@ -897,7 +995,12 @@ async function backfillHashes(){
 function ownerBadge(it){
   if(S.fMember!=='all') return '';
   const m=memberOf(it.memberId); if(!m) return '';
-  return `<span class="owner" style="background:${memberHex(m)}">${esc((m.name||'?').slice(0,1))}</span>`;
+  return `<span class="owner" style="background:${memberHex(m)}">${esc(badgeText(m))}</span>`;
+}
+/* 頭文字。「一」「ー」などは記号に見えるので2文字にする */
+function badgeText(m){
+  const n=String(m?.name||'?').trim();
+  return /^[一ー－\-‐・]/.test(n) ? n.slice(0,2) : n.slice(0,1);
 }
 function qtyBadge(it){ return (it.qty||1)>1 ? `<span class="qty">×${it.qty}</span>` : '' }
 /* メルカリ想定価格（目安） */
@@ -1010,8 +1113,18 @@ function renderToday(){
   let h='';
 
   // 今日着たものを記録するショートカット
-  h+=`<h2 class="sec">今日着た服を記録<span class="c">${wornToday}着</span></h2>`;
-  h+=`<div class="card tiny muted">タップするだけで着用回数と最終着用日が更新されます。ここが貯まると「着ていない服」が正確に出ます。</div>`;
+  const day=S.wearDate||today(), isToday=day===today();
+  const wornOnDay=S.wears.filter(w=>w.date===day).length;
+  h+=`<h2 class="sec">${isToday?'今日':esc(fmtMD(day))}着た服を記録<span class="c">${wornOnDay}着</span></h2>`;
+  h+=`<div class="datebar">
+    ${[[0,'今日'],[1,'昨日'],[2,'おととい']].map(([n,lab])=>{
+      const v=ymd(new Date(Date.now()-n*86400000));
+      return `<button class="chip" data-wday="${v}" aria-pressed="${day===v}">${lab}</button>`;}).join('')}
+    <input type="date" id="wear-date" class="datein" value="${day}" max="${today()}" aria-label="日付を選ぶ">
+  </div>`;
+  h+= isToday
+    ? `<div class="card tiny muted">タップするだけで着用回数と最終着用日が更新されます。つけ忘れた日は、上で日付を選べば後から記録できます。</div>`
+    : `<button class="note amber" data-wday="${today()}" style="display:block;width:100%;text-align:left">${esc(fmtMD(day))}の記録を編集中です。タップで今日に戻ります</button>`;
   h+=`<div class="filters" id="today-mem"></div><div class="grid" id="today-grid"></div>`;
 
   // サイズアウト予測：子どもは全員カードを出し、出せないときは理由を書く
@@ -1055,18 +1168,21 @@ function renderToday(){
 }
 async function drawTodayGrid(){
   const g=$('#today-grid'); if(!g) return;
+  const day=S.wearDate||today();
   const list=S.items.filter(i=>isActive(i)&&i.memberId===S._todayMem)
-    .sort((a,b)=>(b.lastWorn||'').localeCompare(a.lastWorn||''))
-    .slice(0,24);
-  if(!list.length){ g.innerHTML=`<div class="tiny muted" style="grid-column:1/-1">この人の服はまだありません。</div>`; return }
-  g.innerHTML=list.map(it=>{
-    const worn=S.wears.some(w=>w.itemId===it.id&&w.date===today());
-    return `<button class="tile" data-wear="${it.id}">
+    .sort((a,b)=>(b.lastWorn||'').localeCompare(a.lastWorn||''));
+  if(!list.length){
+    if(chunkIO){ chunkIO.disconnect(); chunkIO=null }
+    g.innerHTML=`<div class="tiny muted" style="grid-column:1/-1">この人の服はまだありません。</div>`; return;
+  }
+  chunkGrid(g, list, it=>{
+    const worn=S.wears.some(w=>w.itemId===it.id&&w.date===day);
+    return `<button class="tile ${worn?'worn':''}" data-wear="${it.id}">
       <div class="ph" data-photo="${it.photoId||''}">${catOf(it.category).g}</div>
       ${worn?'<span class="flag ok"></span>':''}
-      <span class="tag">${worn?'着た':esc(it.size||catOf(it.category).n)}</span>
-    </button>`}).join('');
-  hydratePhotos(g);
+      <span class="tag">${worn?'着た':esc(it.size?sizeLabel(it.size):catOf(it.category).n)}</span>
+    </button>`;
+  });
 }
 
 /* ---------- クローゼット ---------- */
@@ -1094,28 +1210,64 @@ function renderCloset(){
       <button class="btn" data-go="add">服を登録する</button></div>`;
     return;
   }
-  $('#closet-body').innerHTML=
-    `<div class="grid" id="closet-grid">`+list.map(it=>{
-      const d=daysSince(it.lastWorn);
-      const flag=isOutgrown(it)?'<span class="flag amber"></span>':'';
-      return `<button class="tile" data-item="${it.id}">
-        <div class="ph" data-photo="${it.photoId||''}" style="${fadeStyle(it)}">${catOf(it.category).g}</div>
-        ${flag}${ownerBadge(it)}${qtyBadge(it)}<span class="tag">${d===null?'未着用':d===0?'今日':d+'日前'}</span>
-      </button>`}).join('')+`</div>
+  $('#closet-body').innerHTML=`<div class="grid" id="closet-grid"></div>
     <div class="legend">
-      <span>色が薄い＝しばらく着ていない服</span>
+      <span>左下＝最後に着た日</span>
+      <span>色が薄い＝しばらく着ていない</span>
       <span><i style="background:var(--amber)"></i>サイズアウト</span>
     </div>`;
-  hydratePhotos($('#closet-grid'));
+  chunkGrid($('#closet-grid'), list, it=>{
+    const flag=isOutgrown(it)?'<span class="flag amber"></span>':'';
+    return `<button class="tile" data-item="${it.id}">
+      <div class="ph" data-photo="${it.photoId||''}" style="${fadeStyle(it)}">${catOf(it.category).g}</div>
+      ${flag}${ownerBadge(it)}${qtyBadge(it)}${it.lastWorn?`<span class="tag">${agoLabel(it.lastWorn)}</span>`:''}
+    </button>`;
+  });
 }
 
-async function hydratePhotos(root){
+/* 画面に近づいた写真だけ読み込む */
+let photoIO=null;
+function hydratePhotos(root){
   if(!root) return;
-  for(const el of root.querySelectorAll('[data-photo]')){
-    const pid=el.getAttribute('data-photo');
-    if(!pid) continue;
-    const u=await photoURL(pid);
-    if(u){ const st=el.getAttribute('style')||''; el.outerHTML=`<img src="${u}" alt="" style="${st}">` }
+  const els=root.querySelectorAll('[data-photo]');
+  if(!('IntersectionObserver' in window)){ els.forEach(loadThumbInto); return }
+  if(!photoIO) photoIO=new IntersectionObserver(es=>{
+    for(const e of es){ if(e.isIntersecting){ photoIO.unobserve(e.target); loadThumbInto(e.target) } }
+  },{rootMargin:'400px 0px'});
+  els.forEach(el=>{ if(el.getAttribute('data-photo')) photoIO.observe(el) });
+}
+async function loadThumbInto(el){
+  const pid=el.getAttribute('data-photo'); if(!pid) return;
+  const u=await thumbURL(pid);
+  if(u&&el.isConnected){
+    const st=el.getAttribute('style')||'';
+    el.outerHTML=`<img src="${u}" alt="" decoding="async" style="${st}">`;
+  }
+}
+/* 一覧を60枚ずつ描く。末尾に近づいたら次を足す */
+const CHUNK=60;
+let chunkIO=null;
+function chunkGrid(container,list,tileFn){
+  if(chunkIO){ chunkIO.disconnect(); chunkIO=null }
+  container.innerHTML='';
+  let i=0;
+  const sentinel=document.createElement('div');
+  sentinel.style.cssText='grid-column:1/-1;height:1px';
+  container.appendChild(sentinel);
+  const add=()=>{
+    const tmp=document.createElement('div');
+    tmp.innerHTML=list.slice(i,i+CHUNK).map(tileFn).join('');
+    while(tmp.firstChild) container.insertBefore(tmp.firstChild,sentinel);
+    i+=CHUNK;
+    hydratePhotos(container);
+    if(i>=list.length){ if(chunkIO){ chunkIO.disconnect(); chunkIO=null } sentinel.remove() }
+  };
+  add();
+  if(i<list.length){
+    if('IntersectionObserver' in window){
+      chunkIO=new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)) add() },{rootMargin:'800px 0px'});
+      chunkIO.observe(sentinel);
+    }else{ while(i<list.length) add() }
   }
 }
 
@@ -1189,8 +1341,10 @@ function renderAdd(){
     <label class="f" for="d-price">買ったときの値段（任意）</label>
     <input type="number" id="d-price" inputmode="numeric" value="${d?.price??''}" placeholder="1990">
 
-    <label class="f" for="d-pdate">購入日（任意）</label>
-    <input type="date" id="d-pdate" value="${d?.purchaseDate||''}">
+    <label class="f">買った時期（任意・だいたいでOK）</label>
+    ${buyChips('data-dbuy', d?.purchaseApprox?d.buyBucket:null)}
+    <label class="f" for="d-pdate">日付が分かるなら</label>
+    <input type="date" id="d-pdate" value="${d?.purchaseApprox?'':(d?.purchaseDate||'')}" max="${today()}">
   </div>
 
   <div class="stickybar">
@@ -1255,7 +1409,7 @@ function rowHTML(it){
   const est=estPrice(it);
   const d=daysSince(it.lastWorn);
   const sub = hd ? `${esc(hd.name)}さんにおさがりできます`
-    : (est?`出品目安 ${yen(est)}`:(d===null?'未着用':d+'日前に着用'));
+    : (est?`出品目安 ${yen(est)}`:(it.lastWorn?agoLabel(it.lastWorn)+'に着用':'まだ着ていない'));
   return `<button class="row" data-item="${it.id}" style="width:100%;text-align:left">
     <span class="th"><span data-photo="${it.photoId||''}">${c.g}</span></span>
     <span class="body">
@@ -1304,7 +1458,11 @@ function renderSet(){
 
   h+=`<h2 class="sec">写真の仕上げ</h2><div class="card">
     <p class="tiny muted" style="margin:0 0 12px">背景を白に近づけ、服を中央に同じ大きさで切り出します。明るさと色かぶりも揃えるので、一覧が整って見えます。うまく切り出せない写真があるときは切ってください。</p>
-    <div class="act"><button class="btn ${S.settings.normalize?'':'ghost'} wide" id="toggle-norm">${S.settings.normalize?'きれいに整える：オン':'きれいに整える：オフ'}</button></div>
+    <div class="chips" id="finish">
+      ${[['strong','しっかり'],['soft','ひかえめ'],['off','しない']].map(([v,n])=>
+        `<button class="chip" data-finish="${v}" aria-pressed="${finishLevel()===v}">${n}</button>`).join('')}
+    </div>
+    <p class="tiny muted" style="margin:10px 0 0">白い服や明るい服が飛ぶときは「ひかえめ」に。設定は次に撮る写真から効きます。</p>
   </div>`;
 
   h+=`<h2 class="sec">バックアップ</h2><div class="card">
@@ -1353,6 +1511,7 @@ async function openItem(id){
   openSheet(`
   <div class="shead"><h3>${esc([c.n,it.size].filter(Boolean).join(' '))}</h3><button class="x" data-close>閉じる</button></div>
   ${u?`<img class="hero" src="${u}" alt="">`:`<div class="hero" style="display:flex;align-items:center;justify-content:center;font-size:52px">${c.g}</div>`}
+  <div class="agebar">${esc(ageLine(it))}</div>
   <dl class="kv">
     <dt>持ち主</dt><dd>${esc(m?m.name:'—')}</dd>
     <dt>色</dt><dd>${esc(it.color||'—')}</dd>
@@ -1360,7 +1519,9 @@ async function openItem(id){
     <dt>シーズン</dt><dd>${(it.season||[]).join('・')||'—'}</dd>
     <dt>持っている枚数</dt><dd><span class="qtyctl"><button data-qty="${it.id}|-1" aria-label="減らす">−</button><b>${it.qty||1}枚</b><button data-qty="${it.id}|1" aria-label="増やす">＋</button></span></dd>
     <dt>着用回数</dt><dd>${it.wearCount||0}回</dd>
-    <dt>最後に着た日</dt><dd>${d===null?'まだ着ていません':(d===0?'今日':d+'日前')}</dd>
+    <dt>最後に着た日</dt><dd>${it.lastWorn?`${esc(fmtMD(it.lastWorn))}・${agoLabel(it.lastWorn)}`:'まだ着ていません'}</dd>
+    <dt>買った時期</dt><dd>${purchaseLabel(it)?esc(purchaseLabel(it)):`<button class="linkish" data-edit="${it.id}">未登録（入力する）</button>`}</dd>
+    <dt>登録した日</dt><dd>${it.addedAt?`${esc(fmtYM(it.addedAt))}・${agoLabel(it.addedAt)}`:'—'}</dd>
     <dt>購入価格</dt><dd>${yen(it.price)}</dd>
     ${cpw!==null?`<dt>1回あたり</dt><dd>${yen(cpw)}</dd>`:''}
     ${moLab?`<dt>着られる期間</dt><dd>${moLab}</dd>`:''}
@@ -1449,7 +1610,7 @@ function openEdit(id){
   const mem=memberOf(it.memberId);
   const kid=(ageOf(mem)??99)<=14;
   const sizes=kid?KID_SIZES.map(String):ADULT_SIZES;
-  S._edit={size:it.size,color:it.color,season:[...(it.season||[])],memberId:it.memberId,category:it.category};
+  S._edit={size:it.size,color:it.color,season:[...(it.season||[])],memberId:it.memberId,category:it.category,buyBucket:it.purchaseApprox?it.buyBucket:null};
   openSheet(`
   <div class="shead"><h3>編集</h3><button class="x" data-close>閉じる</button></div>
   <label class="f">だれの服</label>
@@ -1470,8 +1631,10 @@ function openEdit(id){
   <input type="text" id="e-brand" value="${esc(it.brand||'')}">
   <label class="f" for="e-price">購入価格</label>
   <input type="number" id="e-price" inputmode="numeric" value="${it.price??''}">
-  <label class="f" for="e-pdate">購入日</label>
-  <input type="date" id="e-pdate" value="${it.purchaseDate||''}">
+  <label class="f">買った時期</label>
+  ${buyChips('data-ebuy', it.purchaseApprox?it.buyBucket:null)}
+  <label class="f" for="e-pdate">日付が分かるなら</label>
+  <input type="date" id="e-pdate" value="${it.purchaseApprox?'':(it.purchaseDate||'')}" max="${today()}">
   <div class="act"><button class="btn wide" data-saveedit="${it.id}">保存する</button></div>
   <div class="sp"></div>`);
 }
@@ -1479,34 +1642,31 @@ function openEdit(id){
 /* ============================================================
    操作
    ============================================================ */
-async function wearItem(id){
+async function wearItem(id,date=today()){
   const it=S.items.find(i=>i.id===id); if(!it) return;
-  const t=today();
-  const exist=S.wears.find(w=>w.itemId===id&&w.date===t);
-  if(exist){
-    await dbDel('wears',exist.id);
-    it.wearCount=Math.max(0,(it.wearCount||0)-1);
-    const rest=S.wears.filter(w=>w.itemId===id&&w.id!==exist.id).map(w=>w.date).sort();
-    it.lastWorn=rest.length?rest[rest.length-1]:null;
-    await dbPut('items',it);
-    toast('記録を取り消しました');
-  }else{
-    await dbPut('wears',{id:uid(),itemId:id,date:t});
-    it.wearCount=(it.wearCount||0)+1;
-    it.lastWorn=t;
-    await dbPut('items',it);
-    toast('今日着た服に記録しました');
-  }
+  const exist=S.wears.find(w=>w.itemId===id&&w.date===date);
+  if(exist) await dbDel('wears',exist.id);
+  else await dbPut('wears',{id:uid(),itemId:id,date});
+  // 回数と最終着用日は、記録そのものから数え直す。過去の日付を足しても順序が崩れない
+  const dates=S.wears.filter(w=>w.itemId===id&&w.id!==exist?.id).map(w=>w.date);
+  if(!exist) dates.push(date);
+  dates.sort();
+  it.wearCount=dates.length;
+  it.lastWorn=dates.length?dates[dates.length-1]:null;
+  await dbPut('items',it);
+  toast(exist?'記録を取り消しました':(date===today()?'今日着た服に記録しました':`${fmtMD(date)}に着た服として記録しました`));
   await reload(); render();
 }
 
 /* 再描画で消えないよう、テキスト入力をdraftへ退避 */
 function syncAdd(){
   if(!$('#d-brand')) return;
+  const pd=$('#d-pdate').value;
   S.draft={...(S.draft||{}),
     brand:$('#d-brand').value,
     price:$('#d-price').value,
-    purchaseDate:$('#d-pdate').value};
+    ...(pd ? {purchaseDate:pd,purchaseApprox:false,buyBucket:null}
+           : (S.draft?.purchaseApprox ? {} : {purchaseDate:''}))};
 }
 
 async function saveDraft(keepGoing){
@@ -1517,7 +1677,11 @@ async function saveDraft(keepGoing){
   if(!d.category){ toast('カテゴリを選んでください'); return }
 
   let photoId=null;
-  if(d.blob){ photoId=uid(); await dbPut('photos',{id:photoId,blob:d.blob}) }
+  if(d.blob){
+    photoId=uid();
+    await dbPut('photos',{id:photoId,blob:d.blob});
+    try{ await dbPut('thumbs',{id:photoId,blob:await makeThumb(d.blob)}) }catch(e){}
+  }
 
   const it={
     id:uid(), memberId:mid, category:d.category, photoId,
@@ -1525,6 +1689,7 @@ async function saveDraft(keepGoing){
     color:d.color||null, brand:(d.brand||'').trim()||null,
     price:d.price?Number(d.price):null,
     purchaseDate:d.purchaseDate||null,
+    purchaseApprox:!!(d.purchaseDate&&d.purchaseApprox), buyBucket:d.purchaseApprox?(d.buyBucket||null):null,
     season:d.season||[], status:'active',
     pattern:d.pattern||null, hasCharacterPrint:!!d.hasCharacterPrint,
     sig:d.sig||null, qty:1,
@@ -1571,7 +1736,7 @@ async function importData(file){
       const res=await fetch(p.dataURL); const blob=await res.blob();
       await dbPut('photos',{id:p.id,blob});
     }
-    urlCache.clear();
+    urlCache.clear(); thumbCache.clear();
     await reload(); render();
     toast('読み込みました');
   }catch(e){ toast('読み込めませんでした') }
@@ -1694,14 +1859,32 @@ async function acceptPhoto(source){
   if(S.settings.aiMode==='auto' && S.draft?.blob) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#toggle-norm,#ai-run,#save-api,#toggle-plan,[data-aimode]');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-wear2],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#ai-run,#save-api,#toggle-plan,[data-aimode]');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
-  if(g('data-tab')){ if(g('data-tab')==='closet') S.fSize=null; return go(g('data-tab')) }
+  if(g('data-tab')){ if(g('data-tab')==='closet') S.fSize=null; if(g('data-tab')==='today') S.wearDate=null; return go(g('data-tab')) }
   if(g('data-go'))  return go(g('data-go'));
   if(t.hasAttribute('data-close')) return closeSheet();
 
+  if(g('data-wday')){ const v=g('data-wday'); S.wearDate = v===today()?null:v; return renderToday() }
+  if(g('data-dbuy')){
+    syncAdd();
+    const k=g('data-dbuy'), b=BUY_BUCKETS.find(x=>x[0]===k);
+    const same=S.draft?.purchaseApprox&&S.draft?.buyBucket===k;
+    S.draft={...(S.draft||{}), ...(same
+      ? {purchaseDate:'',purchaseApprox:false,buyBucket:null}
+      : {purchaseDate:monthsAgo(b[2]),purchaseApprox:true,buyBucket:k})};
+    return renderAdd();
+  }
+  if(g('data-ebuy')){
+    const k=g('data-ebuy');
+    S._edit.buyBucket = S._edit.buyBucket===k ? null : k;
+    document.querySelectorAll('#sheet-inner [data-ebuy]').forEach(b=>
+      b.setAttribute('aria-pressed', b.getAttribute('data-ebuy')===S._edit.buyBucket));
+    if(S._edit.buyBucket){ const i=$('#e-pdate'); if(i) i.value='' }
+    return;
+  }
   if(g('data-fcgo')){
     const [mid,size]=g('data-fcgo').split('|');
     S.fMember=mid; S.fCat='all'; S.fSize=Number(size);
@@ -1743,7 +1926,7 @@ document.addEventListener('click',async e=>{
   if(g('data-fc')){ S.fCat=g('data-fc');   return renderCloset() }
   if(g('data-tmem')){ S._todayMem=g('data-tmem'); return renderToday() }
 
-  if(g('data-wear'))  return wearItem(g('data-wear'));
+  if(g('data-wear'))  return wearItem(g('data-wear'), S.wearDate||today());
   if(g('data-wear2')){ await wearItem(g('data-wear2')); return closeSheet() }
   if(g('data-item'))  return openItem(g('data-item'));
   if(g('data-member'))return openMemberForm(g('data-member'));
@@ -1780,9 +1963,9 @@ document.addEventListener('click',async e=>{
     }catch(e){ toast('つながりませんでした') }
     return;
   }
-  if(t.id==='toggle-norm'){
-    S.settings.normalize=!S.settings.normalize; saveSettings(); renderSet();
-    toast(S.settings.normalize?'きれいに整えます':'撮ったままを使います');
+  if(g('data-finish')){
+    S.settings.finish=g('data-finish'); saveSettings(); renderSet();
+    toast({strong:'しっかり整えます',soft:'ひかえめに整えます',off:'撮ったままを使います'}[S.settings.finish]);
     return;
   }
   if(t.id==='save-next') return saveDraft(true);
@@ -1855,7 +2038,14 @@ document.addEventListener('click',async e=>{
       size:S._edit.size, color:S._edit.color, season:S._edit.season,
       brand:($('#e-brand').value||'').trim()||null,
       price:$('#e-price').value?Number($('#e-price').value):null,
-      purchaseDate:$('#e-pdate').value||null
+      ...(()=>{
+        const v=$('#e-pdate').value;
+        if(v) return {purchaseDate:v,purchaseApprox:false,buyBucket:null};
+        const b=BUY_BUCKETS.find(x=>x[0]===S._edit.buyBucket);
+        // 同じ区分のままなら元の日付を残す。そうしないと保存のたびに経過が巻き戻る
+        if(b) return {purchaseDate:(it.purchaseApprox&&it.buyBucket===b[0]&&it.purchaseDate)?it.purchaseDate:monthsAgo(b[2]),purchaseApprox:true,buyBucket:b[0]};
+        return {purchaseDate:null,purchaseApprox:false,buyBucket:null};
+      })()
     });
     await dbPut('items',it); await reload(); closeSheet(); render(); toast('保存しました');
     return;
@@ -1888,7 +2078,7 @@ document.addEventListener('click',async e=>{
   if(g('data-del')){
     if(!confirm('この服を削除します。よろしいですか？')) return;
     const it=S.items.find(i=>i.id===g('data-del'));
-    if(it?.photoId) await dbDel('photos',it.photoId);
+    if(it?.photoId){ await dbDel('photos',it.photoId); await dbDel('thumbs',it.photoId) }
     await dbDel('items',g('data-del'));
     await reload(); closeSheet(); render(); toast('削除しました');
     return;
@@ -1903,6 +2093,17 @@ document.addEventListener('click',async e=>{
 $('#scrim').addEventListener('click',closeSheet);
 
 document.addEventListener('change',async e=>{
+  if(e.target.id==='wear-date'){
+    const v=e.target.value;
+    if(v&&v<=today()){ S.wearDate = v===today()?null:v; renderToday() }
+    return;
+  }
+  if(e.target.id==='d-pdate'){ syncAdd(); renderAdd(); return }
+  if(e.target.id==='e-pdate' && e.target.value){
+    S._edit.buyBucket=null;
+    document.querySelectorAll('#sheet-inner [data-ebuy]').forEach(b=>b.setAttribute('aria-pressed','false'));
+    return;
+  }
   if(e.target.id==='shot'){
     const f=e.target.files?.[0];
     e.target.value='';
