@@ -310,6 +310,26 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .pickbtn{min-height:56px;font-size:calc(16.5px*var(--fs,1))}
 .homerest{margin-top:26px;padding-top:4px;border-top:1px solid var(--line)}
 .homerest h2.sec:first-child{margin-top:18px}
+/* まとめて登録 */
+.batchentry{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;text-align:left;
+  padding:14px 16px;margin-bottom:12px;border-radius:var(--r);border:2px dashed var(--indigo);background:var(--indigo-bg);color:var(--indigo-d)}
+.batchentry b{font-size:calc(16px*var(--fs,1))}
+.batchentry span{font-size:calc(12.5px*var(--fs,1));color:var(--ink2)}
+.blist{display:flex;flex-direction:column;gap:8px}
+.brow{display:flex;gap:10px;align-items:center;padding:8px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+.brow.need{border-color:var(--amber);background:var(--amber-bg)}
+.brow>img{width:84px;height:84px;flex:0 0 84px;border-radius:10px;object-fit:cover;background:var(--surface2)}
+.brow .bbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.brow select{min-height:40px;padding:0 30px 0 10px;font-size:max(16px,calc(14px*var(--fs,1)));
+  background:var(--surface2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235C7480' stroke-width='2' fill='none'/%3E%3C/svg%3E") no-repeat right 10px center}
+.brow .bst{font-size:calc(12px*var(--fs,1));color:var(--ink2);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.brow .bst.busy,.brow .bst.wait{color:var(--indigo)}
+.brow .bst.err{color:var(--amber)}
+.brow .bst .sw{display:inline-block;width:12px;height:12px;border-radius:4px;border:1px solid var(--line)}
+.bdel{width:40px;height:40px;flex:0 0 40px;border-radius:10px;color:var(--ink3);font-size:calc(16px*var(--fs,1))}
+.cam-count{margin:0;color:#fff;font-weight:700;font-size:calc(15px*var(--fs,1))}
+.cam-stage.flash::after{content:'';position:absolute;inset:0;background:#fff;opacity:.6;animation:camflash .25s forwards}
+@keyframes camflash{to{opacity:0}}
 .stats.small div{padding:11px 6px}
 .stats.small b{font-size:calc(18px*var(--fs,1))}
 .outfit-photo{width:100%;max-height:44vh;object-fit:contain;border-radius:14px;background:#000;display:block;margin-bottom:10px}
@@ -386,12 +406,14 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
     <div class="cam-guide"><i></i><i></i><i></i><i></i></div>
   </div>
   <p class="cam-tip">平らな場所に広げて、枠いっぱいに入れてください。<br>手でしわを伸ばすときれいに写ります。</p>
+  <p class="cam-count" id="cam-count" hidden></p>
   <div class="cam-bar">
     <button class="cam-side" id="cam-close">閉じる</button>
     <button class="cam-shot" id="cam-shoot" aria-label="撮影"><span></span></button>
     <button class="cam-side" id="cam-pick">写真から</button>
   </div>
 </div>
+<input type="file" id="batch-file" accept="image/*" multiple hidden>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1265,6 +1287,7 @@ function renderToday(){
         <span class="g">📷</span>
         <p>服がまだ1着もありません。<br>まずは今日着た服を撮ってみてください。</p>
         <button class="btn" data-go="add">服を登録する</button>
+        <div class="act" style="justify-content:center"><button class="btn sub" data-batch>📚 まとめて登録する</button></div>
       </div>`;
     return;
   }
@@ -1647,6 +1670,7 @@ function renderAdd(){
       <p>先に家族を登録してください。</p><button class="btn" data-go="set">家族を登録する</button></div>`;
     return;
   }
+  if(S.batch) return renderBatch();
   const d=S.draft;
   const todayN=S.items.filter(i=>i.addedAt===today()).length;
   $('#add-streak').textContent=todayN?`今日 ${todayN}着`:'';
@@ -1662,6 +1686,8 @@ function renderAdd(){
   ${d?.wearOn?`<div class="note ok" style="margin-bottom:10px">${d.hint?`「${esc(d.hint)}」を登録します。`:''}保存すると、${esc(fmtMD(d.wearOn.date))}に着た服としても記録します。
     ${d.outfitSrc&&!d.photoURL?`<div class="act" style="margin-top:8px"><button class="btn sub sm" id="use-outfit">さっきの全身写真で登録する</button></div>`:''}
     <button class="linkish" id="cancel-wearon" style="display:block;margin-top:8px">着た記録はしない</button></div>`:''}
+  ${!d?.photoURL&&!d?.wearOn?`<button class="batchentry" data-batch><b>📚 まとめて登録</b>
+    <span>何着も続けて撮って、最後にまとめて登録します。最初の登録におすすめです</span></button>`:''}
   <div class="card">
     <button class="shot ${d?.photoURL?'has':''}" id="shot-label">
       ${d?.photoURL?`<img src="${d.photoURL}" alt="撮影した服">`:'<span class="g">📷</span><span>服を撮る</span>'}
@@ -2310,20 +2336,192 @@ async function aiAnalyze(){
 }
 
 /* ============================================================
+   まとめて登録。1着ずつ続けて撮るか写真をまとめて選び、AIが後から1着ずつ埋める
+   ============================================================ */
+const BATCH_PARALLEL=2;     // AIに同時に送る数
+function startBatch(){
+  if(!S.members.length) return go('set');
+  if(!S.batch) S.batch={mid:S.lastUsed.memberId??S.members[0].id, list:[], running:0, shooting:0};
+  if(!memberOf(S.batch.mid)) S.batch.mid=S.members[0].id;
+  if(S.view!=='add') go('add'); else renderAdd();
+}
+function batchSizeOf(it,m){ return it.size ?? (it.category==='shoes' ? '' : (m?.currentSize ?? '')) }
+function batchRow(it,m){
+  const sz=String(batchSizeOf(it,m)??'');
+  const opts=[...(it.category==='shoes' ? SHOE_SIZES : isKidMember(m) ? [...KID_SIZES,...ADULT_SIZES] : [...ADULT_SIZES,...KID_SIZES]), FREE_SIZE];
+  if(sz && !opts.includes(sz)) opts.unshift(sz);
+  const col=COLORS.find(c=>c.n===it.color);
+  const st={wait:'AIの順番待ち',busy:'✨ AIが判別中…',ok:'AIが判別しました',
+    err:'AIで判別できませんでした',skip:'カテゴリを選んでください'}[it.st]||'';
+  const need=!it.category&&it.st!=='busy'&&it.st!=='wait';
+  return `<div class="brow ${need?'need':''}" id="br-${it.k}">
+    <img src="${it.url}" alt="">
+    <div class="bbody">
+      <select data-bk="${it.k}" data-bf="category" aria-label="カテゴリ">
+        <option value="">カテゴリを選ぶ</option>
+        ${CATS.map(c=>`<option value="${c.id}" ${it.category===c.id?'selected':''}>${c.g} ${c.n}</option>`).join('')}
+      </select>
+      <select data-bk="${it.k}" data-bf="size" aria-label="サイズ">
+        <option value="">サイズなし</option>
+        ${opts.map(v=>`<option value="${esc(v)}" ${sz===v?'selected':''}>${esc(sizeLabel(v))}</option>`).join('')}
+      </select>
+      <span class="bst ${it.st}">${col?`<i class="sw" style="background:${col.hex}"></i>${esc(col.n)}・`:''}${st}
+        ${it.st==='err'?`<button class="linkish" data-bretry="${it.k}">もう一度</button>`:''}</span>
+    </div>
+    <button class="bdel" data-bdel="${it.k}" aria-label="この服を外す">✕</button>
+  </div>`;
+}
+function renderBatch(){
+  const b=S.batch; if(!b) return;
+  const n=b.list.length, aiOn=S.settings.aiMode!=='off';
+  $('#add-streak').textContent=n?`${n}着`:'';
+  $('#add-body').innerHTML=`
+  <div class="card">
+    <div class="homehead"><b>まとめて登録</b><span class="num">${n}着</span></div>
+    <label class="f" style="margin-top:0">だれの服</label>
+    <div class="chips">${S.members.map(x=>
+      `<button class="chip" data-bmem="${x.id}" aria-pressed="${x.id===b.mid}"><span class="mdot" style="background:${memberHex(x)}"></span>${esc(x.name)}</button>`).join('')}</div>
+    <div class="act">
+      <button class="btn" id="batch-cam">📷 続けて撮る</button>
+      <button class="btn sub" id="batch-pick">🖼 写真から</button>
+    </div>
+    <p class="tiny muted" style="margin:10px 0 0">${aiOn
+      ?`撮るだけで、カテゴリ・色・シーズンはAIが後から埋めます（1着につき1回・${aiRemainLabel()}）。`
+      :'AIは設定で「使わない」になっています。カテゴリは自分で選んでください。'}写真から選ぶときは、何枚でもまとめて選べます。</p>
+  </div>
+  ${n?`<h2 class="sec">撮った服<span class="c" id="batch-count"></span></h2>
+    ${b.list.some(i=>i.st==='skip')&&aiOn?`<div class="note amber" style="margin-bottom:10px">AIの回数が足りないため、一部の服はAIで判別していません。カテゴリを選んでください。</div>`:''}
+    <div class="blist">${b.list.map(it=>batchRow(it,memberOf(b.mid))).join('')}</div>
+    <p class="tiny muted" style="margin:10px 2px 0">色・ブランド・値段などは、登録したあとクローゼットでいつでも直せます。</p>`
+  :`<div class="empty"><span class="g">📚</span><p>まだ1着も撮っていません。<br>「続けて撮る」で、服を1着ずつ撮っていきます。</p></div>`}
+  <div class="stickybar">
+    <button class="btn sub" id="batch-cancel">やめる</button>
+    <button class="btn" id="batch-save"></button>
+  </div>`;
+  batchChrome();
+}
+/* 件数と登録ボタンだけを更新する（選んでいる最中の欄を描き直さない） */
+function batchChrome(){
+  const b=S.batch; if(!b||S.view!=='add') return;
+  const n=b.list.length, pend=b.list.filter(i=>i.st==='wait'||i.st==='busy').length;
+  const done=b.list.filter(i=>i.st==='ok').length;
+  const c=$('#batch-count'); if(c) c.textContent=S.settings.aiMode!=='off'?`AI判別 ${done}/${n}`:'';
+  const btn=$('#batch-save'); if(!btn) return;
+  btn.disabled=!n||pend>0;
+  btn.textContent=pend?`AI判別中…（あと${pend}着）`:`${n}着を登録する`;
+}
+function batchRefresh(it){
+  if(!S.batch||S.view!=='add') return;
+  const row=$('#br-'+it.k);
+  if(row && !row.contains(document.activeElement)) row.outerHTML=batchRow(it,memberOf(S.batch.mid));
+  batchChrome();
+}
+async function addBatchPhoto(src){
+  const b=S.batch; if(!b) return;
+  try{
+    const {blob,color}=await processPhoto(src);
+    const sig=await photoSig(blob);
+    b.list.push({k:uid(),blob,sig,url:URL.createObjectURL(blob),color:color||null,
+      st:S.settings.aiMode!=='off'?'wait':'skip'});
+  }catch(e){ toast('読み込めない写真がありました'); return }
+  if(S.batch===b && S.view==='add') renderBatch();
+  pumpBatchAi();
+}
+/* 順番待ちの服を、同時に BATCH_PARALLEL 着ずつAIに送る */
+function pumpBatchAi(){
+  const b=S.batch; if(!b) return;
+  while(b.running<BATCH_PARALLEL){
+    const it=b.list.find(i=>i.st==='wait'); if(!it) break;
+    if(aiRemaining()-b.running<=0){        // 回数は成功したときに減るので、送信中の分を差し引いて見る
+      b.list.forEach(i=>{ if(i.st==='wait') i.st='skip' });
+      if(S.view==='add') renderBatch();
+      break;
+    }
+    it.st='busy'; b.running++;
+    batchRefresh(it);
+    batchAnalyze(it).finally(()=>{ b.running--; if(S.batch===b){ batchRefresh(it); pumpBatchAi() } });
+  }
+}
+async function batchAnalyze(it){
+  try{
+    const image=await analysisDataURL(it.blob);
+    const ctl=new AbortController(), tm=setTimeout(()=>ctl.abort(),45000);
+    const res=await fetch(API_BASE+'/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({image}),signal:ctl.signal}).finally(()=>clearTimeout(tm));
+    const json=await res.json().catch(()=>null);
+    if(!res.ok||!json?.ok) throw new Error(json?.error||('HTTP '+res.status));
+    consumeAi();
+    const r=json.result||{};
+    if(!it.touchedCat && r.category && CATS.some(c=>c.id===r.category)) it.category=r.category;
+    if(r.color && COLORS.some(c=>c.n===r.color)) it.color=r.color;
+    if(Array.isArray(r.season)) it.season=r.season.filter(s=>SEASONS.includes(s));
+    it.pattern=r.pattern||null; it.hasCharacterPrint=!!r.hasCharacterPrint;
+    it.st='ok';
+  }catch(e){ it.st='err' }
+}
+async function saveBatch(){
+  const b=S.batch; if(!b||!b.list.length) return;
+  if(b.list.some(i=>i.st==='busy'||i.st==='wait')){ toast('AIの判別が終わるまでお待ちください'); return }
+  const miss=b.list.filter(i=>!i.category);
+  if(miss.length){
+    toast(`カテゴリが決まっていない服が${miss.length}着あります`);
+    $('#br-'+miss[0].k)?.scrollIntoView({block:'center',behavior:'smooth'});
+    return;
+  }
+  const room=plan().items-countItems();
+  if(room<=0) return openLimit('items');
+  const m=memberOf(b.mid), take=b.list.slice(0,room);
+  const btn=$('#batch-save'); if(btn){ btn.disabled=true; btn.textContent='登録しています…' }
+  for(const it of take){
+    const photoId=uid();
+    await dbPut('photos',{id:photoId,blob:it.blob});
+    try{ await dbPut('thumbs',{id:photoId,blob:await makeThumb(it.blob)}) }catch(e){}
+    await dbPut('items',{
+      id:uid(), memberId:b.mid, category:it.category, photoId,
+      size:String(batchSizeOf(it,m)??''), color:it.color||null, brand:null, price:null,
+      purchaseDate:null, purchaseApprox:false, buyBucket:null,
+      season:it.season||[], status:'active',
+      pattern:it.pattern||null, hasCharacterPrint:!!it.hasCharacterPrint,
+      sig:it.sig||null, qty:1, wearCount:0, lastWorn:null, addedAt:today()
+    });
+    URL.revokeObjectURL(it.url);
+  }
+  S.lastUsed={memberId:b.mid,category:take[take.length-1].category};
+  b.list=b.list.slice(take.length);
+  await reload();
+  toast(`${take.length}着を登録しました`);
+  if(b.list.length){ renderBatch(); return openLimit('items') }   // 上限で入りきらなかった分は残しておく
+  S.batch=null;
+  go('closet');
+}
+function cancelBatch(){
+  const b=S.batch; if(!b) return;
+  if(b.list.length && !confirm(`撮った${b.list.length}着を、登録せずに消します。よろしいですか？`)) return;
+  b.list.forEach(i=>URL.revokeObjectURL(i.url));
+  S.batch=null; renderAdd();
+}
+/* 撮った写真はまだ端末に保存していないので、閉じる前に知らせる */
+window.addEventListener('beforeunload',e=>{ if(S.batch?.list.length){ e.preventDefault(); e.returnValue='' } });
+
+/* ============================================================
    カメラ
    ============================================================ */
 let camStream=null;
 
-async function openCamera(){
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ $('#shot').click(); return }
+async function openCamera(batch=false){
+  const pick=batch?'#batch-file':'#shot';
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ $(pick).click(); return }
   try{
     camStream=await navigator.mediaDevices.getUserMedia({
       video:{facingMode:{ideal:'environment'},width:{ideal:1600},height:{ideal:1600}},
       audio:false});
   }catch(e){
     toast('カメラを使えないので写真から選びます');
-    $('#shot').click(); return;
+    $(pick).click(); return;
   }
+  S._camBatch=batch;
+  $('#cam-close').textContent=batch?'完了':'閉じる';
+  camCount();
   const v=$('#cam-video');
   v.srcObject=camStream;
   $('#cam').classList.add('on');
@@ -2333,6 +2531,14 @@ function closeCamera(){
   if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null }
   const v=$('#cam-video'); if(v) v.srcObject=null;
   $('#cam').classList.remove('on');
+  if(S._camBatch){ S._camBatch=false; camCount(); if(S.view==='add') renderAdd() }
+}
+/* まとめて撮っているときだけ、撮った枚数を出す */
+function camCount(){
+  const el=$('#cam-count'); if(!el) return;
+  const n=S._camBatch&&S.batch ? S.batch.list.length+(S.batch.shooting||0) : 0;
+  el.hidden=!S._camBatch;
+  el.textContent=n?`📚 ${n}着 撮りました。次の服に置きかえてどうぞ`:'📚 1着ずつ続けて撮れます';
 }
 async function shootCamera(){
   const v=$('#cam-video');
@@ -2341,6 +2547,13 @@ async function shootCamera(){
   const s=Math.round(Math.min(vw,vh)*0.92);          // ガイド枠にあたる中央の正方形
   const cv=document.createElement('canvas'); cv.width=s; cv.height=s;
   cv.getContext('2d').drawImage(v,(vw-s)/2,(vh-s)/2,s,s,0,0,s,s);
+  if(S._camBatch){                                    // 閉じずに次を撮れるようにする
+    const st=$('.cam-stage'); st.classList.remove('flash'); void st.offsetWidth; st.classList.add('flash');
+    S.batch.shooting=(S.batch.shooting||0)+1; camCount();
+    await addBatchPhoto(cv);
+    S.batch&&(S.batch.shooting--); camCount();
+    return;
+  }
   closeCamera();
   await acceptPhoto(cv);
 }
@@ -2361,7 +2574,7 @@ async function acceptPhoto(source){
   if(S.settings.aiMode==='auto' && S.draft?.blob) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wpick],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-step],[data-wearon],[data-fontscale],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wpick],[data-batch],[data-bmem],[data-bdel],[data-bretry],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-step],[data-wearon],[data-fontscale],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#batch-cam,#batch-pick,#batch-save,#batch-cancel,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
@@ -2428,6 +2641,19 @@ document.addEventListener('click',async e=>{
   if(g('data-fc')){ S.fCat=g('data-fc');   return renderCloset() }
   if(g('data-tmem')){ S._todayMem=g('data-tmem'); return renderToday() }
   if(t.hasAttribute('data-wpick')) return openWearPicker();
+  if(t.hasAttribute('data-batch')) return startBatch();
+  if(g('data-bmem')){ if(S.batch){ S.batch.mid=g('data-bmem'); renderBatch() } return }
+  if(g('data-bdel')){
+    const b=S.batch, i=b?b.list.findIndex(x=>x.k===g('data-bdel')):-1;
+    if(i<0) return;
+    if(b.list[i].st==='busy') return toast('AIの判別が終わってから外せます');
+    URL.revokeObjectURL(b.list[i].url); b.list.splice(i,1); return renderBatch();
+  }
+  if(g('data-bretry')){ const it=S.batch?.list.find(x=>x.k===g('data-bretry')); if(it){ it.st='wait'; pumpBatchAi() } return }
+  if(t.id==='batch-cam') return openCamera(true);
+  if(t.id==='batch-pick') return $('#batch-file').click();
+  if(t.id==='batch-save') return saveBatch();
+  if(t.id==='batch-cancel') return cancelBatch();
 
   if(g('data-wear'))  return wearItem(g('data-wear'), S.wearDate||today());
   if(g('data-wear2')){ const id=g('data-wear2'); await wearItem(id); return openItem(id) }
@@ -2459,6 +2685,7 @@ document.addEventListener('click',async e=>{
     S.draft={...(S.draft||{}),season:[...cur]}; return renderAdd();
   }
   if(t.id==='shot-label'||t.id==='shot-redo') return openCamera();
+  if(t.id==='cam-pick' && S._camBatch){ closeCamera(); return $('#batch-file').click() }
   if(t.id==='shot-pick'||t.id==='cam-pick'){ closeCamera(); return $('#shot').click() }
   if(t.id==='cam-close') return closeCamera();
   if(t.id==='cam-shoot') return shootCamera();
@@ -2721,6 +2948,22 @@ function applyFontScale(){
 applyFontScale();
 
 document.addEventListener('change',async e=>{
+  if(e.target.id==='batch-file'){
+    const fs=[...(e.target.files||[])]; e.target.value='';
+    if(!fs.length||!S.batch) return;
+    toast(`${fs.length}枚を読み込んでいます…`);
+    for(const f of fs) await addBatchPhoto(f);     // 1枚ずつ処理して、端末のメモリを使いすぎない
+    return;
+  }
+  if(e.target.hasAttribute('data-bk')){
+    const it=S.batch?.list.find(i=>i.k===e.target.getAttribute('data-bk')); if(!it) return;
+    const v=e.target.value;
+    if(e.target.getAttribute('data-bf')==='category'){ it.category=v||null; it.touchedCat=true }
+    else it.size=v;
+    e.target.blur();
+    batchRefresh(it);
+    return;
+  }
   if(e.target.id==='outfit-file'){
     const f=e.target.files?.[0]; e.target.value='';
     if(f) await outfitIdentify(f);
