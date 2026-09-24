@@ -616,13 +616,27 @@ function plan(){ return PLANS[planKey()] }
 function keepLabel(p){ return p.photoKeep.days ? `直近${p.photoKeep.days}日` : `直近${p.photoKeep.count}枚` }
 function savePacks(){ try{ localStorage.setItem('kazokuro-packs',JSON.stringify(S.packs)) }catch(e){} }
 function livePacks(){ const now=Date.now(); return (S.packs||[]).filter(k=>k.remaining>0&&k.expires>now).sort((a,b)=>a.expires-b.expires) }
-function monthlyLeft(){ return Math.max(0, plan().ai - usageNow().count) }
+/* はじめての30日。最初の登録がいちばん手間なので、使い始めて30日間は毎月の回数の代わりにAIを200回まで使える */
+const WELCOME_DAYS=30, WELCOME_AI=200;
+function welcome(){
+  if(!S.settings.startedAt){ S.settings.startedAt=Date.now(); saveSettings() }
+  const end=S.settings.startedAt+WELCOME_DAYS*86400000;
+  if(Date.now()>=end) return null;
+  const used=S.settings.welcomeUsed||0;
+  return {end, used, left:Math.max(0,WELCOME_AI-used)};
+}
+function monthlyLeft(){ const w=welcome(); return w ? w.left : Math.max(0, plan().ai - usageNow().count) }
 function packLeft(){ return livePacks().reduce((t,k)=>t+k.remaining,0) }
 function aiRemaining(){ return monthlyLeft()+packLeft() }
-function aiRemainLabel(){ const k=packLeft(); return `今月あと${monthlyLeft()}回`+(k?`＋パック${k}回`:'') }
+function aiRemainLabel(){
+  const k=packLeft(), w=welcome();
+  return (w?`はじめての30日 あと${w.left}回（${fmtMD(ymd(new Date(w.end-1))).replace(/（.）/,'')}まで）`:`今月あと${monthlyLeft()}回`)+(k?`＋パック${k}回`:'');
+}
 /* 毎月の枠を先に使い、なくなったら期限の近いパックから減らす */
 function consumeAi(){
-  if(monthlyLeft()>0){ const u=usageNow(); u.count++; saveUsage(); return }
+  const w=welcome();
+  if(w){ if(w.left>0){ S.settings.welcomeUsed=w.used+1; saveSettings(); return } }
+  else if(monthlyLeft()>0){ const u=usageNow(); u.count++; saveUsage(); return }
   const k=livePacks()[0]; if(k){ k.remaining--; savePacks() }
 }
 function countItems(){ return S.items.filter(i=>(i.status||'active')!=='sold').length }
@@ -641,7 +655,7 @@ function openLimit(kind){
   const msg={
     items:`${x.name}プランで登録できる服は${x.items}着までです。`,
     members:`${x.name}プランで登録できる家族は${x.members}人までです。`,
-    ai:`今月のAI判別（${x.ai}回）を使い切りました。`
+    ai:welcome()?`はじめての30日のAI判別（${WELCOME_AI}回）を使い切りました。`:`今月のAI判別（${x.ai}回）を使い切りました。`
   }[kind];
   openSheet(`
     <div class="shead"><h3>上限に達しました</h3><button class="x" data-close>閉じる</button></div>
@@ -1942,8 +1956,9 @@ function renderSet(){
     </div>
     <div class="act"><button class="btn ghost sm" id="save-api">接続を確認する</button></div>
     <div class="hr"></div>
-    <div class="fc-row"><b>${usageNow().count} / ${plan().ai}</b>
-      <span>今月の判別回数</span>
+    ${welcome()?`<div class="fc-row"><b>${welcome().used} / ${WELCOME_AI}</b>
+      <span>はじめての30日の判別回数</span>`:`<div class="fc-row"><b>${usageNow().count} / ${plan().ai}</b>
+      <span>今月の判別回数</span>`}
       <em class="${aiRemaining()<=0?'amber':'indigo'}">${aiRemainLabel()}</em></div>
     <p class="tiny muted" style="margin:10px 0 0">写真で記録も1回として数えます。</p>
   </div>`;
@@ -1957,7 +1972,8 @@ function renderSet(){
       <dt>家族</dt><dd>${S.members.length} / ${plan().members}人</dd>
       <dt>服</dt><dd>${countItems()} / ${plan().items}着</dd>
       <dt>着た日の写真</dt><dd>拡大用 ${bigN}枚（${keepLabel(plan())}）</dd>
-      <dt>AI（今月）</dt><dd>${usageNow().count} / ${plan().ai}回</dd>
+      ${welcome()?`<dt>AI（はじめての30日）</dt><dd>${welcome().used} / ${WELCOME_AI}回</dd>`
+        :`<dt>AI（今月）</dt><dd>${usageNow().count} / ${plan().ai}回</dd>`}
       <dt>回数パック</dt><dd>${pk.length?`残り${packLeft()}回（期限 ${ymd(new Date(pk[0].expires))}）`:'なし'}</dd>
     </dl>
     <div class="act"><button class="btn sub sm" id="add-pack">回数パックを追加（${PACK_SIZE}回・テスト）</button></div>
