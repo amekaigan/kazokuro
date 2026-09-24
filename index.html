@@ -362,6 +362,8 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .iv-steps li{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);
   border-radius:14px;padding:12px 14px;font-weight:700;text-align:left;font-size:calc(15px*var(--fs,1))}
 .iv-steps i{flex:0 0 28px;height:28px;border-radius:14px;background:#FFE7A8;color:#16324A;font-style:normal;display:flex;align-items:center;justify-content:center}
+.intro .nb{display:inline-block}
+.intro-s,.intro-d,.intro-slide h2{text-wrap:balance}
 .intro-more{margin-top:12px;color:#fff;font-weight:700;text-decoration:underline;min-height:44px;padding:8px 12px}
 .iv-tiles,.iv-pair{display:flex;gap:8px;margin:6px 0 8px}
 .iv-tiles span,.iv-pair span{flex:1;aspect-ratio:1;border-radius:12px;background:#F1F5F7;border:2px solid #E6ECEE;
@@ -1542,68 +1544,70 @@ function markWornTiles(){
 
 /* ---------- はじめての説明。横にめくる全画面のスライド ---------- */
 const INTRO=[
-  {g:'👕', t:'家族ローゼット', s:'子どもの服、<br>もう着られないのはどれ？',
+  {g:'👕', t:'家族ローゼット', s:'子どもの服、<br>もう着られないのは|どれ？',
    v:`<div class="iv-cloud"><span>👕</span><span>👗</span><span>👖</span><span>🧥</span><span>🧦</span></div>
       <div class="iv-chip">110サイズ　あと約2か月</div>`,
-   d:'家族みんなの服を、撮るだけで管理。<br>子どものサイズアウトを先に教えます。'},
-  {g:'📷', t:'まとめて撮影', s:'何十着でも、続けて撮るだけ',
+   d:'家族みんなの服を、|撮るだけで管理。<br>子どものサイズアウトを|先に教えます。'},
+  {g:'📷', t:'まとめて撮影', s:'何十着でも、|続けて撮るだけ',
    v:`<div class="iv-card"><div class="iv-row"><b>今から撮るサイズ</b><em>110</em></div>
       <div class="iv-cam">📚 110サイズ・12着 撮りました</div>
       <div class="iv-row"><span>✨ 種類・色・季節</span><em>AIが入力</em></div></div>`,
-   d:'引き出しごとにサイズを選んで、服を置きかえてはシャッター。<br>1着ずつ入力する手間はいりません。種類・色・季節はAIが埋めます。'},
-  {g:'📏', t:'サイズアウトを先読み', s:'身長から、服ごとに「あと何か月」',
+   d:'引き出しごとに|サイズを選んで、<br>服を置きかえては|シャッター。<br>1着ずつ入力する手間は|いりません。<br>種類・色・季節は|AIが埋めます。'},
+  {g:'📏', t:'サイズアウトを先読み', s:'身長から、|服ごとに|「あと何か月」',
    v:`<div class="iv-card"><div class="iv-row"><b>🔴 もう小さい服</b><em class="r">3着</em></div>
       <div class="iv-row"><b>🟡 あと3か月以内</b><em class="a">5着</em></div>
       <div class="iv-row"><b>🟢 まだ着られる</b><em class="o">34着</em></div></div>`,
-   d:'登録が終わるとすぐに診断。<br>「ああ、確かにもう小さいかも」が分かります。'},
-  {g:'🎁', t:'おさがり・手放す', s:'下の子へ、フリマへ。迷わず回せる',
+   d:'登録が終わると|すぐに診断。<br>「ああ、確かに|もう小さいかも」が|分かります。'},
+  {g:'🎁', t:'おさがり・手放す', s:'下の子へ、|フリマへ。<br>迷わず回せる',
    v:`<div class="iv-card"><div class="iv-note ok">👕 あさひくんが今ちょうど着られます</div>
       <div class="iv-note">📝 出品の文章と値段の目安をすぐ作成</div>
       <div class="iv-note">🔁 同じ服の二重登録にも気づきます</div></div>`,
-   d:'サイズアウトした服の行き先まで、<br>アプリが一緒に考えます。'},
-  {g:'🔒', t:'さっそく始めましょう', s:'会員登録なし。写真はスマホの中に',
+   d:'サイズアウトした服の|行き先まで、<br>アプリが|一緒に考えます。'},
+  {g:'🔒', t:'さっそく始めましょう', s:'会員登録なし。<br>写真は|スマホの中に',
    v:`<ol class="iv-steps"><li><i>1</i>家族を登録（身長も）</li><li><i>2</i>服をまとめて登録</li><li><i>3</i>診断結果を見る</li></ol>`,
-   d:'写真を外に送るのは、AIで判別するときだけ。<br>使い始めて30日間は、AIを200回まで使えます。',last:'intro'}
+   d:'写真を外に送るのは、<br>AIで判別するときだけ。<br>使い始めて30日間は、<br>AIを200回まで|使えます。',last:'intro'}
 ];
 /* 機能ガイド。はじめての説明で伝えきれない機能を、もっと知りたい人に */
 const GUIDE=[
-  {g:'👀', t:'今日の服は撮るだけ', s:'着ている服を撮ると、<br>登録済みの服から探します',
+  {g:'👀', t:'今日の服は撮るだけ', s:'着ている服を撮ると、<br>登録済みの服から|探します',
    v:`<div class="iv-card"><div class="iv-row"><b>この服を着ていますか？</b></div>
       <div class="iv-tiles"><span>👕<em>確度 92%</em></span><span>👖<em>確度 85%</em></span><span>🧥<em>確度 61%</em></span></div>
       <div class="iv-note ok">✓ 選んだ2着を記録する</div></div>`,
-   d:'候補から選ぶだけで、今日着た服の記録が終わります。<br>写っているのに未登録の服は、その場で登録できます。'},
-  {g:'🗓', t:'着た記録からわかること', s:'よく着る服、眠っている服',
+   d:'候補から選ぶだけで、<br>今日の記録は|おしまい。<br>写っているのに|未登録の服も、<br>その場で|登録できます。'},
+  {g:'🗓', t:'着た記録からわかること', s:'よく着る服、|眠っている服',
    v:`<div class="iv-card"><div class="iv-row"><span>よく着る順</span><em>いちばん着た服</em></div>
       <div class="iv-row"><span>長く着ていない順</span><em class="a">120日以上</em></div>
       <div class="iv-row"><span>昨日・おとといの分も</span><em class="o">あとから記録</em></div></div>`,
-   d:'4か月着ていない服は「手放す」に出てきます。<br>記録を忘れた日も、日付を選べばあとから入れられます。'},
-  {g:'🔁', t:'同じ服に気づく', s:'登録するとき、似た服を知らせます',
+   d:'4か月着ていない服は、<br>「手放す」に|出てきます。<br>記録を忘れた日も、<br>あとから|入れられます。'},
+  {g:'🔁', t:'同じ服に気づく', s:'登録するとき、<br>似た服を|知らせます',
    v:`<div class="iv-card"><div class="iv-pair"><span>👔<em>今撮った写真</em></span><span>👔<em>登録済み</em></span></div>
-      <div class="iv-note">同じ服ですか？　同じ／もう1枚持っている／別の服</div></div>`,
-   d:'写り方や背景が違っても、写真の色と柄で比べます。<br>すでに重なって登録した服も、クローゼットで1つにまとめられます。'},
-  {g:'🏷', t:'手放すときに', s:'出品の文章と値段の目安をすぐ作成',
+      <div class="iv-note"><b>同じ服ですか？</b><br><span class="nb">同じ服</span>／<span class="nb">もう1枚ある</span>／<span class="nb">別の服</span></div></div>`,
+   d:'写り方や背景が|違っても、<br>色と柄で|比べます。<br>重なって登録した服も、<br>クローゼットで|1つにまとめられます。'},
+  {g:'🏷', t:'手放すときに', s:'出品の文章と|値段の目安を、<br>すぐに作成',
    v:`<div class="iv-card"><div class="iv-row"><span>出品の目安</span><em>¥1,200</em></div>
       <div class="iv-row"><span>1回あたりの値段</span><em class="o">¥85</em></div>
       <div class="iv-note">📋 出品用の文章をコピー</div></div>`,
-   d:'買った値段と着た回数から、目安を出します。<br>下の子に回せる服は、おさがり先も教えます。'},
-  {g:'📏', t:'身長の記録で、もっと正確に', s:'2回以上あると、その子のペースで予測',
+   d:'買った値段と|着た回数から、<br>目安を|出します。<br>下の子に回せる服は、<br>おさがり先も|教えます。'},
+  {g:'📏', t:'身長の記録で、もっと正確に', s:'2回以上の記録で、<br>その子のペースで|予測',
    v:`<div class="iv-card"><div class="iv-row"><span>2025年4月</span><em>104.5cm</em></div>
       <div class="iv-row"><span>2026年4月</span><em>111.0cm</em></div>
       <div class="iv-row"><b>この子のペース</b><em class="o">年 6.5cm</em></div></div>`,
-   d:'母子手帳や学校の記録から、過去の身長も入れられます。<br>記録が増えるほど「あと何か月」が正確になります。'},
-  {g:'💾', t:'データを守る', s:'写真ごと書き出して、バックアップ',
+   d:'母子手帳や学校の記録から、<br>過去の身長も|入れられます。<br>記録が増えるほど、<br>予測が|正確になります。'},
+  {g:'💾', t:'データを守る', s:'写真ごと書き出して、<br>バックアップ',
    v:`<div class="iv-card"><div class="iv-note">📦 写真ごと書き出す</div><div class="iv-note">📂 読み込む（機種変更のときも）</div></div>`,
-   d:'会員登録なしで、データはこのスマホの中に保存されます。<br>機種変更の前には、設定から書き出してください。',last:'guide'}
+   d:'会員登録なしで、<br>データは|このスマホの中に。<br>機種変更の前には、<br>設定から|書き出してください。',last:'guide'}
 ];
+/* 日本語は幅でどこでも折り返すので、「|」で区切ったまとまりの途中では改行しないようにする */
+const phr=t=>t.split('<br>').map(line=>line.split('|').map(x=>`<span class="nb">${x}</span>`).join('')).join('<br>');
 function openIntro(kind='intro'){
   const LIST=kind==='guide'?GUIDE:INTRO;
   const el=$('#intro');
   el.innerHTML=`<button class="intro-skip" data-introclose>スキップ</button>
     <div class="intro-track" id="intro-track">${LIST.map((x,i)=>`<section class="intro-slide">
       <div class="intro-g">${x.g}</div>
-      <h2>${x.t}</h2><p class="intro-s">${x.s}</p>
+      <h2>${x.t}</h2><p class="intro-s">${phr(x.s)}</p>
       <div class="intro-v">${x.v}</div>
-      <p class="intro-d">${x.d}</p>
+      <p class="intro-d">${phr(x.d)}</p>
       ${x.last==='intro'?`<button class="btn wide intro-go" data-introstart>はじめる（家族を登録する）</button>
         <button class="intro-more" data-guide>もっと詳しい機能を見る ›</button>`:''}
       ${x.last==='guide'?`<button class="btn wide intro-go" data-introclose>閉じる</button>`:''}
