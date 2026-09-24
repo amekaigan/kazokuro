@@ -38,8 +38,9 @@ html{-webkit-text-size-adjust:100%}
 html,body{margin:0;height:100%;overflow-x:hidden}
 body{
   background:var(--bg); color:var(--ink);
-  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
-  font-size:calc(15px*var(--fs,1)); line-height:1.6; letter-spacing:.01em;
+  /* iPhoneのふつうのアプリと同じ文字（システムフォント）。字間は空けない */
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  font-size:calc(15px*var(--fs,1)); line-height:1.6;
   padding-top:var(--safe-t);
   -webkit-font-smoothing:antialiased;
   touch-action:manipulation;
@@ -55,7 +56,7 @@ button{cursor:pointer;border:none;background:none;padding:0}
 .view.on{display:block}
 
 header.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:20px 0 14px}
-header.top h1{margin:0;font-size:calc(20px*var(--fs,1));font-weight:700;letter-spacing:.02em}
+header.top h1{margin:0;font-size:calc(20px*var(--fs,1));font-weight:700}
 header.top .sub{font-size:calc(12.5px*var(--fs,1));color:var(--ink2);font-variant-numeric:tabular-nums}
 
 /* ---------- bottom nav ---------- */
@@ -129,7 +130,7 @@ textarea{resize:vertical;line-height:1.7}
 .tile img{width:100%;height:100%;object-fit:cover;display:block;transition:filter .3s}
 .tile .ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:calc(26px*var(--fs,1));opacity:.35}
 .tile .tag{position:absolute;left:6px;bottom:6px;padding:4px 8px;border-radius:7px;
-  background:rgba(10,22,27,.78);color:#fff;font-size:calc(11.5px*var(--fs,1));font-weight:700;letter-spacing:.02em}
+  background:rgba(10,22,27,.78);color:#fff;font-size:calc(11.5px*var(--fs,1));font-weight:700}
 .tile .flag{position:absolute;right:5px;top:5px;width:9px;height:9px;border-radius:5px;box-shadow:0 0 0 2px var(--surface)}
 .tile .flag.amber{background:var(--amber)}
 .tile .flag.ok{background:var(--ok)}
@@ -149,7 +150,7 @@ textarea{resize:vertical;line-height:1.7}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line2);
   border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .stats div{background:var(--surface);padding:14px 8px;text-align:center}
-.stats b{display:block;font-size:calc(21px*var(--fs,1));font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.stats b{display:block;font-size:calc(21px*var(--fs,1));font-weight:700;font-variant-numeric:tabular-nums}
 .stats span{font-size:calc(11px*var(--fs,1));color:var(--ink2)}
 
 /* ---------- list rows ---------- */
@@ -341,7 +342,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .intro-slide{flex:0 0 100%;scroll-snap-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;
   text-align:center;padding:calc(env(safe-area-inset-top,0px) + 56px) 24px 12px;box-sizing:border-box;overflow-y:auto}
 .intro-g{font-size:calc(54px*var(--fs,1));line-height:1;margin-bottom:12px;filter:drop-shadow(0 6px 14px rgba(0,0,0,.25))}
-.intro-slide h2{margin:0;font-size:calc(26px*var(--fs,1));font-weight:800;letter-spacing:.02em}
+.intro-slide h2{margin:0;font-size:calc(26px*var(--fs,1));font-weight:700}
 .intro-s{margin:8px 0 18px;font-size:calc(17px*var(--fs,1));font-weight:700;color:#FFE7A8;line-height:1.5}
 .intro-d{margin:18px 0 0;font-size:calc(14px*var(--fs,1));line-height:1.8;color:rgba(255,255,255,.88)}
 .intro-v{width:100%;max-width:340px}
@@ -351,7 +352,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .iv-card{background:rgba(255,255,255,.96);color:#16323B;border-radius:18px;padding:12px 14px;text-align:left;box-shadow:0 12px 30px rgba(0,0,0,.25)}
 .iv-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid #E6ECEE;font-size:calc(14px*var(--fs,1))}
 .iv-row:first-child{border-top:none}
-.iv-row em{font-style:normal;font-weight:800;color:#24557A}
+.iv-row em{font-style:normal;font-weight:700;color:#24557A}
 .iv-row em.r{color:#9B3B33}.iv-row em.a{color:#A96E12}.iv-row em.o{color:#35705A}
 .iv-cam{margin:4px 0;padding:10px;border-radius:10px;background:#0B1418;color:#fff;font-weight:700;font-size:calc(13px*var(--fs,1));text-align:center}
 .iv-note{padding:9px 10px;border-radius:10px;background:#F1F5F7;margin-top:8px;font-size:calc(13.5px*var(--fs,1));font-weight:600}
@@ -361,6 +362,13 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .iv-steps li{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);
   border-radius:14px;padding:12px 14px;font-weight:700;text-align:left;font-size:calc(15px*var(--fs,1))}
 .iv-steps i{flex:0 0 28px;height:28px;border-radius:14px;background:#FFE7A8;color:#16324A;font-style:normal;display:flex;align-items:center;justify-content:center}
+.intro-more{margin-top:12px;color:#fff;font-weight:700;text-decoration:underline;min-height:44px;padding:8px 12px}
+.iv-tiles,.iv-pair{display:flex;gap:8px;margin:6px 0 8px}
+.iv-tiles span,.iv-pair span{flex:1;aspect-ratio:1;border-radius:12px;background:#F1F5F7;border:2px solid #E6ECEE;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:calc(30px*var(--fs,1))}
+.iv-tiles span:nth-child(-n+2){border-color:#35705A}
+.iv-pair span{aspect-ratio:auto;padding:16px 0}
+.iv-tiles em,.iv-pair em{font-style:normal;font-size:calc(11px*var(--fs,1));font-weight:700;color:#5C7480;margin-top:4px}
 .intro-go{margin-top:20px;background:#FFE7A8;color:#16324A!important;max-width:340px}
 .intro-foot{display:flex;align-items:center;justify-content:space-between;padding:12px 20px calc(env(safe-area-inset-bottom,0px) + 16px)}
 .intro-dots{display:flex;gap:8px}
@@ -1538,11 +1546,11 @@ const INTRO=[
    v:`<div class="iv-cloud"><span>👕</span><span>👗</span><span>👖</span><span>🧥</span><span>🧦</span></div>
       <div class="iv-chip">110サイズ　あと約2か月</div>`,
    d:'家族みんなの服を、撮るだけで管理。<br>子どものサイズアウトを先に教えます。'},
-  {g:'📷', t:'撮るだけで登録', s:'引き出しごと、続けて撮るだけ',
+  {g:'📷', t:'まとめて撮影', s:'何十着でも、続けて撮るだけ',
    v:`<div class="iv-card"><div class="iv-row"><b>今から撮るサイズ</b><em>110</em></div>
       <div class="iv-cam">📚 110サイズ・12着 撮りました</div>
       <div class="iv-row"><span>✨ 種類・色・季節</span><em>AIが入力</em></div></div>`,
-   d:'サイズを選んで、服を置きかえてはシャッター。<br>細かい入力はAIがあとから埋めます。'},
+   d:'引き出しごとにサイズを選んで、服を置きかえてはシャッター。<br>1着ずつ入力する手間はいりません。種類・色・季節はAIが埋めます。'},
   {g:'📏', t:'サイズアウトを先読み', s:'身長から、服ごとに「あと何か月」',
    v:`<div class="iv-card"><div class="iv-row"><b>🔴 もう小さい服</b><em class="r">3着</em></div>
       <div class="iv-row"><b>🟡 あと3か月以内</b><em class="a">5着</em></div>
@@ -1555,26 +1563,59 @@ const INTRO=[
    d:'サイズアウトした服の行き先まで、<br>アプリが一緒に考えます。'},
   {g:'🔒', t:'さっそく始めましょう', s:'会員登録なし。写真はスマホの中に',
    v:`<ol class="iv-steps"><li><i>1</i>家族を登録（身長も）</li><li><i>2</i>服をまとめて登録</li><li><i>3</i>診断結果を見る</li></ol>`,
-   d:'写真を外に送るのは、AIで判別するときだけ。<br>使い始めて30日間は、AIを200回まで使えます。',last:true}
+   d:'写真を外に送るのは、AIで判別するときだけ。<br>使い始めて30日間は、AIを200回まで使えます。',last:'intro'}
 ];
-function openIntro(){
+/* 機能ガイド。はじめての説明で伝えきれない機能を、もっと知りたい人に */
+const GUIDE=[
+  {g:'👀', t:'今日の服は撮るだけ', s:'着ている服を撮ると、<br>登録済みの服から探します',
+   v:`<div class="iv-card"><div class="iv-row"><b>この服を着ていますか？</b></div>
+      <div class="iv-tiles"><span>👕<em>確度 92%</em></span><span>👖<em>確度 85%</em></span><span>🧥<em>確度 61%</em></span></div>
+      <div class="iv-note ok">✓ 選んだ2着を記録する</div></div>`,
+   d:'候補から選ぶだけで、今日着た服の記録が終わります。<br>写っているのに未登録の服は、その場で登録できます。'},
+  {g:'🗓', t:'着た記録からわかること', s:'よく着る服、眠っている服',
+   v:`<div class="iv-card"><div class="iv-row"><span>よく着る順</span><em>いちばん着た服</em></div>
+      <div class="iv-row"><span>長く着ていない順</span><em class="a">120日以上</em></div>
+      <div class="iv-row"><span>昨日・おとといの分も</span><em class="o">あとから記録</em></div></div>`,
+   d:'4か月着ていない服は「手放す」に出てきます。<br>記録を忘れた日も、日付を選べばあとから入れられます。'},
+  {g:'🔁', t:'同じ服に気づく', s:'登録するとき、似た服を知らせます',
+   v:`<div class="iv-card"><div class="iv-pair"><span>👔<em>今撮った写真</em></span><span>👔<em>登録済み</em></span></div>
+      <div class="iv-note">同じ服ですか？　同じ／もう1枚持っている／別の服</div></div>`,
+   d:'写り方や背景が違っても、写真の色と柄で比べます。<br>すでに重なって登録した服も、クローゼットで1つにまとめられます。'},
+  {g:'🏷', t:'手放すときに', s:'出品の文章と値段の目安をすぐ作成',
+   v:`<div class="iv-card"><div class="iv-row"><span>出品の目安</span><em>¥1,200</em></div>
+      <div class="iv-row"><span>1回あたりの値段</span><em class="o">¥85</em></div>
+      <div class="iv-note">📋 出品用の文章をコピー</div></div>`,
+   d:'買った値段と着た回数から、目安を出します。<br>下の子に回せる服は、おさがり先も教えます。'},
+  {g:'📏', t:'身長の記録で、もっと正確に', s:'2回以上あると、その子のペースで予測',
+   v:`<div class="iv-card"><div class="iv-row"><span>2025年4月</span><em>104.5cm</em></div>
+      <div class="iv-row"><span>2026年4月</span><em>111.0cm</em></div>
+      <div class="iv-row"><b>この子のペース</b><em class="o">年 6.5cm</em></div></div>`,
+   d:'母子手帳や学校の記録から、過去の身長も入れられます。<br>記録が増えるほど「あと何か月」が正確になります。'},
+  {g:'💾', t:'データを守る', s:'写真ごと書き出して、バックアップ',
+   v:`<div class="iv-card"><div class="iv-note">📦 写真ごと書き出す</div><div class="iv-note">📂 読み込む（機種変更のときも）</div></div>`,
+   d:'会員登録なしで、データはこのスマホの中に保存されます。<br>機種変更の前には、設定から書き出してください。',last:'guide'}
+];
+function openIntro(kind='intro'){
+  const LIST=kind==='guide'?GUIDE:INTRO;
   const el=$('#intro');
   el.innerHTML=`<button class="intro-skip" data-introclose>スキップ</button>
-    <div class="intro-track" id="intro-track">${INTRO.map((x,i)=>`<section class="intro-slide">
+    <div class="intro-track" id="intro-track">${LIST.map((x,i)=>`<section class="intro-slide">
       <div class="intro-g">${x.g}</div>
       <h2>${x.t}</h2><p class="intro-s">${x.s}</p>
       <div class="intro-v">${x.v}</div>
       <p class="intro-d">${x.d}</p>
-      ${x.last?`<button class="btn wide intro-go" data-introstart>はじめる（家族を登録する）</button>`:''}
+      ${x.last==='intro'?`<button class="btn wide intro-go" data-introstart>はじめる（家族を登録する）</button>
+        <button class="intro-more" data-guide>もっと詳しい機能を見る ›</button>`:''}
+      ${x.last==='guide'?`<button class="btn wide intro-go" data-introclose>閉じる</button>`:''}
     </section>`).join('')}</div>
-    <div class="intro-foot"><div class="intro-dots">${INTRO.map((_,i)=>`<i class="${i?'':'on'}"></i>`).join('')}</div>
+    <div class="intro-foot"><div class="intro-dots">${LIST.map((_,i)=>`<i class="${i?'':'on'}"></i>`).join('')}</div>
       <button class="btn sm intro-next" data-intronext>次へ</button></div>`;
   el.hidden=false; document.body.style.overflow='hidden';
   const tr=$('#intro-track');
   tr.addEventListener('scroll',()=>{
     const i=Math.round(tr.scrollLeft/tr.clientWidth);
     el.querySelectorAll('.intro-dots i').forEach((d,k)=>d.classList.toggle('on',k===i));
-    const nx=el.querySelector('.intro-next'); if(nx) nx.style.visibility=i>=INTRO.length-1?'hidden':'';
+    const nx=el.querySelector('.intro-next'); if(nx) nx.style.visibility=i>=LIST.length-1?'hidden':'';
   },{passive:true});
 }
 function closeIntro(){
@@ -2141,7 +2182,8 @@ function renderSet(){
     子どものサイズアウトを、手遅れになる前に教えるアプリです。<br><br>
     身長の記録が2回以上あると、その子の実際の成長ペースで予測します。<br>
     コーデ提案は、服のデータが貯まってから追加する予定です。
-    <div class="act"><button class="btn sub wide" data-intro>アプリの説明をもう一度見る</button></div>
+    <div class="act"><button class="btn sub wide" data-intro>アプリの説明をもう一度見る</button>
+      <button class="btn sub wide" data-guide>機能ガイド（くわしい使い方）</button></div>
   </div>`;
   $('#set-body').innerHTML=h;
 }
@@ -3008,11 +3050,12 @@ async function acceptPhoto(source){
   if(S.settings.aiMode==='auto' && S.draft?.blob) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wpick],[data-batch],[data-bmem],[data-bdel],[data-bretry],[data-bsize],[data-hest],[data-newmember],[data-intro],[data-introclose],[data-intronext],[data-introstart],[data-diag],[data-diagdone],[data-bdup],[data-bdupact],[data-dupreview],[data-dupmerge],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-step],[data-wearon],[data-fontscale],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#batch-cam,#batch-pick,#batch-save,#batch-cancel,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wpick],[data-batch],[data-bmem],[data-bdel],[data-bretry],[data-bsize],[data-hest],[data-newmember],[data-intro],[data-guide],[data-introclose],[data-intronext],[data-introstart],[data-diag],[data-diagdone],[data-bdup],[data-bdupact],[data-dupreview],[data-dupmerge],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-step],[data-wearon],[data-fontscale],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#batch-cam,#batch-pick,#batch-save,#batch-cancel,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
   if(t.hasAttribute('data-intro')) return openIntro();
+  if(t.hasAttribute('data-guide')){ if(!$('#intro').hidden) closeIntro(); return openIntro('guide') }
   if(t.hasAttribute('data-introclose')) return closeIntro();
   if(t.hasAttribute('data-intronext')){ const tr=$('#intro-track'); tr.scrollBy({left:tr.clientWidth,behavior:'smooth'}); return }
   if(t.hasAttribute('data-introstart')){ closeIntro(); go('today'); return S.members.length?null:openMemberForm(null) }
