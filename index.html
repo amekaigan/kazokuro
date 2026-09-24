@@ -332,6 +332,42 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .bdup img,.bdup .ph{width:34px;height:34px;flex:0 0 34px;border-radius:7px;object-fit:cover;background:var(--surface2);
   display:flex;align-items:center;justify-content:center;font-size:calc(16px*var(--fs,1))}
 .dupnote{display:block;width:100%;text-align:left;font-weight:700;margin:4px 0 2px}
+.intro{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;color:#fff;
+  background:linear-gradient(160deg,#16324A 0%,#24557A 55%,#3E7FA8 100%)}
+.intro-skip{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;z-index:2;color:rgba(255,255,255,.85);
+  font-weight:700;padding:10px 14px;min-height:44px;font-size:calc(14px*var(--fs,1))}
+.intro-track{flex:1;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.intro-track::-webkit-scrollbar{display:none}
+.intro-slide{flex:0 0 100%;scroll-snap-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:calc(env(safe-area-inset-top,0px) + 56px) 24px 12px;box-sizing:border-box;overflow-y:auto}
+.intro-g{font-size:calc(54px*var(--fs,1));line-height:1;margin-bottom:12px;filter:drop-shadow(0 6px 14px rgba(0,0,0,.25))}
+.intro-slide h2{margin:0;font-size:calc(26px*var(--fs,1));font-weight:800;letter-spacing:.02em}
+.intro-s{margin:8px 0 18px;font-size:calc(17px*var(--fs,1));font-weight:700;color:#FFE7A8;line-height:1.5}
+.intro-d{margin:18px 0 0;font-size:calc(14px*var(--fs,1));line-height:1.8;color:rgba(255,255,255,.88)}
+.intro-v{width:100%;max-width:340px}
+.iv-cloud{display:flex;justify-content:center;gap:6px;font-size:calc(40px*var(--fs,1))}
+.iv-cloud span:nth-child(odd){transform:translateY(8px)}
+.iv-chip{display:inline-block;margin-top:14px;padding:8px 14px;border-radius:999px;background:#FAF0DC;color:#A96E12;font-weight:700;font-size:calc(14px*var(--fs,1))}
+.iv-card{background:rgba(255,255,255,.96);color:#16323B;border-radius:18px;padding:12px 14px;text-align:left;box-shadow:0 12px 30px rgba(0,0,0,.25)}
+.iv-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid #E6ECEE;font-size:calc(14px*var(--fs,1))}
+.iv-row:first-child{border-top:none}
+.iv-row em{font-style:normal;font-weight:800;color:#24557A}
+.iv-row em.r{color:#9B3B33}.iv-row em.a{color:#A96E12}.iv-row em.o{color:#35705A}
+.iv-cam{margin:4px 0;padding:10px;border-radius:10px;background:#0B1418;color:#fff;font-weight:700;font-size:calc(13px*var(--fs,1));text-align:center}
+.iv-note{padding:9px 10px;border-radius:10px;background:#F1F5F7;margin-top:8px;font-size:calc(13.5px*var(--fs,1));font-weight:600}
+.iv-note:first-child{margin-top:0}
+.iv-note.ok{background:#E4F0EA;color:#35705A}
+.iv-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.iv-steps li{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);
+  border-radius:14px;padding:12px 14px;font-weight:700;text-align:left;font-size:calc(15px*var(--fs,1))}
+.iv-steps i{flex:0 0 28px;height:28px;border-radius:14px;background:#FFE7A8;color:#16324A;font-style:normal;display:flex;align-items:center;justify-content:center}
+.intro-go{margin-top:20px;background:#FFE7A8;color:#16324A!important;max-width:340px}
+.intro-foot{display:flex;align-items:center;justify-content:space-between;padding:12px 20px calc(env(safe-area-inset-bottom,0px) + 16px)}
+.intro-dots{display:flex;gap:8px}
+.intro-dots i{width:8px;height:8px;border-radius:4px;background:rgba(255,255,255,.35);transition:width .2s}
+.intro-dots i.on{width:22px;background:#fff}
+.intro-next{background:rgba(255,255,255,.18);color:#fff!important;border:1px solid rgba(255,255,255,.4)}
+.cam-hint{font-weight:600;color:#FFE7A8;font-size:calc(13.5px*var(--fs,1))}
 .steps{margin-bottom:14px;border:2px solid var(--indigo)}
 .step{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line2);opacity:.55}
 .step:first-of-type{border-top:none}
@@ -351,7 +387,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .diagcard .diagrow.out span{color:var(--danger)}
 .diagcard .diagrow.soon span{color:var(--amber)}
 .diagcard .diagrow.ok span{color:var(--ok)}
-.cam-count{margin:0;color:#fff;font-weight:700;font-size:calc(15px*var(--fs,1))}
+.cam-count{margin:0;color:#fff;font-weight:700;font-size:calc(15px*var(--fs,1));text-align:center;line-height:1.6;padding:0 16px}
 .cam-stage.flash::after{content:'';position:absolute;inset:0;background:#fff;opacity:.6;animation:camflash .25s forwards}
 @keyframes camflash{to{opacity:0}}
 .stats.small div{padding:11px 6px}
@@ -438,6 +474,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
   </div>
 </div>
 <input type="file" id="batch-file" accept="image/*" multiple hidden>
+<div class="intro" id="intro" hidden></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1495,6 +1532,56 @@ function markWornTiles(){
   });
 }
 
+/* ---------- はじめての説明。横にめくる全画面のスライド ---------- */
+const INTRO=[
+  {g:'👕', t:'家族ローゼット', s:'子どもの服、<br>もう着られないのはどれ？',
+   v:`<div class="iv-cloud"><span>👕</span><span>👗</span><span>👖</span><span>🧥</span><span>🧦</span></div>
+      <div class="iv-chip">110サイズ　あと約2か月</div>`,
+   d:'家族みんなの服を、撮るだけで管理。<br>子どものサイズアウトを先に教えます。'},
+  {g:'📷', t:'撮るだけで登録', s:'引き出しごと、続けて撮るだけ',
+   v:`<div class="iv-card"><div class="iv-row"><b>今から撮るサイズ</b><em>110</em></div>
+      <div class="iv-cam">📚 110サイズ・12着 撮りました</div>
+      <div class="iv-row"><span>✨ 種類・色・季節</span><em>AIが入力</em></div></div>`,
+   d:'サイズを選んで、服を置きかえてはシャッター。<br>細かい入力はAIがあとから埋めます。'},
+  {g:'📏', t:'サイズアウトを先読み', s:'身長から、服ごとに「あと何か月」',
+   v:`<div class="iv-card"><div class="iv-row"><b>🔴 もう小さい服</b><em class="r">3着</em></div>
+      <div class="iv-row"><b>🟡 あと3か月以内</b><em class="a">5着</em></div>
+      <div class="iv-row"><b>🟢 まだ着られる</b><em class="o">34着</em></div></div>`,
+   d:'登録が終わるとすぐに診断。<br>「ああ、確かにもう小さいかも」が分かります。'},
+  {g:'🎁', t:'おさがり・手放す', s:'下の子へ、フリマへ。迷わず回せる',
+   v:`<div class="iv-card"><div class="iv-note ok">👕 あさひくんが今ちょうど着られます</div>
+      <div class="iv-note">📝 出品の文章と値段の目安をすぐ作成</div>
+      <div class="iv-note">🔁 同じ服の二重登録にも気づきます</div></div>`,
+   d:'サイズアウトした服の行き先まで、<br>アプリが一緒に考えます。'},
+  {g:'🔒', t:'さっそく始めましょう', s:'会員登録なし。写真はスマホの中に',
+   v:`<ol class="iv-steps"><li><i>1</i>家族を登録（身長も）</li><li><i>2</i>服をまとめて登録</li><li><i>3</i>診断結果を見る</li></ol>`,
+   d:'写真を外に送るのは、AIで判別するときだけ。<br>使い始めて30日間は、AIを200回まで使えます。',last:true}
+];
+function openIntro(){
+  const el=$('#intro');
+  el.innerHTML=`<button class="intro-skip" data-introclose>スキップ</button>
+    <div class="intro-track" id="intro-track">${INTRO.map((x,i)=>`<section class="intro-slide">
+      <div class="intro-g">${x.g}</div>
+      <h2>${x.t}</h2><p class="intro-s">${x.s}</p>
+      <div class="intro-v">${x.v}</div>
+      <p class="intro-d">${x.d}</p>
+      ${x.last?`<button class="btn wide intro-go" data-introstart>はじめる（家族を登録する）</button>`:''}
+    </section>`).join('')}</div>
+    <div class="intro-foot"><div class="intro-dots">${INTRO.map((_,i)=>`<i class="${i?'':'on'}"></i>`).join('')}</div>
+      <button class="btn sm intro-next" data-intronext>次へ</button></div>`;
+  el.hidden=false; document.body.style.overflow='hidden';
+  const tr=$('#intro-track');
+  tr.addEventListener('scroll',()=>{
+    const i=Math.round(tr.scrollLeft/tr.clientWidth);
+    el.querySelectorAll('.intro-dots i').forEach((d,k)=>d.classList.toggle('on',k===i));
+    const nx=el.querySelector('.intro-next'); if(nx) nx.style.visibility=i>=INTRO.length-1?'hidden':'';
+  },{passive:true});
+}
+function closeIntro(){
+  const el=$('#intro'); el.hidden=true; el.innerHTML=''; document.body.style.overflow='';
+  if(!S.settings.introSeen){ S.settings.introSeen=true; saveSettings() }
+}
+
 /* はじめの3ステップ。家族 → まとめて登録 → 診断結果 の順に案内し、全部終わったら出さない */
 function stepsCard(){
   const s1=S.members.length>0, s2=S.items.some(isActive), s3=!!S.settings.diagSeen;
@@ -2054,6 +2141,7 @@ function renderSet(){
     子どものサイズアウトを、手遅れになる前に教えるアプリです。<br><br>
     身長の記録が2回以上あると、その子の実際の成長ペースで予測します。<br>
     コーデ提案は、服のデータが貯まってから追加する予定です。
+    <div class="act"><button class="btn sub wide" data-intro>アプリの説明をもう一度見る</button></div>
   </div>`;
   $('#set-body').innerHTML=h;
 }
@@ -2499,6 +2587,16 @@ function startBatch(){
   if(!memberOf(S.batch.mid)) S.batch.mid=S.members[0].id;
   if(S.view!=='add') go('add'); else renderAdd();
 }
+/* 選んだサイズが、その子に今どうか。撮る前・撮っている最中に一言だけ出す */
+function sizeHint(m,size){
+  if(!m||size==null||!isKidMember(m)) return '';
+  const g=growthInfo(m), s=sizeNum(size); if(!g||s===null) return '';
+  const mo=monthsLeft(m,s), who=`${m.name}さん（約${g.nowH.toFixed(0)}cm）`;
+  if(mo<=0) return `${who}には、もう小さいかも`;
+  if(mo<=3) return `${who}は、あと約${Math.max(1,Math.round(mo))}か月で小さくなりそう`;
+  if(mo>=24) return `${who}には、まだ大きめ`;
+  return `${who}は、あと約${Math.round(mo)}か月着られそう`;
+}
 function batchSizeChoices(m){ return isKidMember(m) ? KID_SIZES : ADULT_SIZES }
 function batchSizeOf(it,m){ return it.size ?? (it.category==='shoes' ? '' : (m?.currentSize ?? '')) }
 /* 登録済みの服か、この一覧で先に撮った服に似ていれば、その相手を返す */
@@ -2556,6 +2654,7 @@ function renderBatch(){
     <div class="chips g5">${batchSizeChoices(memberOf(b.mid)).map(v=>
       `<button class="chip" data-bsize="${esc(v)}" aria-pressed="${b.size===v}">${esc(sizeLabel(v))}</button>`).join('')}
       <button class="chip" data-bsize="" aria-pressed="${b.size==null}" style="grid-column:span 2">バラバラ</button></div>
+    ${b.size!=null&&sizeHint(memberOf(b.mid),b.size)?`<div class="note ${monthsLeft(memberOf(b.mid),sizeNum(b.size))<=3?'amber':'indigo'} tiny" style="margin-top:8px">📏 ${esc(sizeHint(memberOf(b.mid),b.size))}</div>`:''}
     <p class="tiny muted" style="margin:6px 0 0">${b.size!=null
       ?`このあと撮る服は <b>${esc(sizeLabel(b.size))}</b> で登録します。引き出しごと（サイズごと）に撮ると楽です。`
       :'サイズを選ぶと、このあと撮る服に自動で入ります。バラバラのときは一覧で1着ずつ選べます。'}</p>
@@ -2871,7 +2970,9 @@ function camCount(){
   const n=S._camBatch&&S.batch ? S.batch.list.length+(S.batch.shooting||0) : 0;
   el.hidden=!S._camBatch;
   const sz=S.batch?.size!=null?`${sizeLabel(S.batch.size)}サイズ・`:'';
-  el.textContent=n?`📚 ${sz}${n}着 撮りました。次の服に置きかえてどうぞ`:`📚 ${sz}1着ずつ続けて撮れます`;
+  const hint=S.batch?.size!=null?sizeHint(memberOf(S.batch.mid),S.batch.size):'';
+  el.innerHTML=esc(n?`📚 ${sz}${n}着 撮りました。次の服に置きかえてどうぞ`:`📚 ${sz}1着ずつ続けて撮れます`)
+    +(hint?`<br><span class="cam-hint">📏 ${esc(hint)}</span>`:'');
 }
 async function shootCamera(){
   const v=$('#cam-video');
@@ -2907,10 +3008,14 @@ async function acceptPhoto(source){
   if(S.settings.aiMode==='auto' && S.draft?.blob) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wpick],[data-batch],[data-bmem],[data-bdel],[data-bretry],[data-bsize],[data-hest],[data-newmember],[data-diag],[data-diagdone],[data-bdup],[data-bdupact],[data-dupreview],[data-dupmerge],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-step],[data-wearon],[data-fontscale],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#batch-cam,#batch-pick,#batch-save,#batch-cancel,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wpick],[data-batch],[data-bmem],[data-bdel],[data-bretry],[data-bsize],[data-hest],[data-newmember],[data-intro],[data-introclose],[data-intronext],[data-introstart],[data-diag],[data-diagdone],[data-bdup],[data-bdupact],[data-dupreview],[data-dupmerge],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-step],[data-wearon],[data-fontscale],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#batch-cam,#batch-pick,#batch-save,#batch-cancel,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
+  if(t.hasAttribute('data-intro')) return openIntro();
+  if(t.hasAttribute('data-introclose')) return closeIntro();
+  if(t.hasAttribute('data-intronext')){ const tr=$('#intro-track'); tr.scrollBy({left:tr.clientWidth,behavior:'smooth'}); return }
+  if(t.hasAttribute('data-introstart')){ closeIntro(); go('today'); return S.members.length?null:openMemberForm(null) }
   if(t.hasAttribute('data-diagdone')) S.diag=null;
   if(g('data-diag')){ S.diag={mid:g('data-diag'),n:0}; return go('add') }
   if(g('data-tab')){ S.diag=null; if(g('data-tab')==='closet') S.fSize=null; if(g('data-tab')==='today') S.wearDate=null; return go(g('data-tab')) }
@@ -3395,6 +3500,7 @@ document.addEventListener('change',async e=>{
     await enforcePhotoRetention();
     const ver=$('#ver'); if(ver) ver.textContent='v'+APP_VERSION;
     go('today');
+    if(!S.members.length && !S.settings.introSeen) openIntro();
     backfillHashes();
     if(fixed) setTimeout(()=>toast(fixed+'着の写真を復旧しました'),600);
   }catch(e){
