@@ -327,6 +327,11 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .brow .bst.err{color:var(--amber)}
 .brow .bst .sw{display:inline-block;width:12px;height:12px;border-radius:4px;border:1px solid var(--line)}
 .bdel{width:40px;height:40px;flex:0 0 40px;border-radius:10px;color:var(--ink3);font-size:calc(16px*var(--fs,1))}
+.bdup{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:6px 8px;border-radius:10px;
+  background:var(--amber-bg);color:var(--amber);font-size:calc(12.5px*var(--fs,1));font-weight:700}
+.bdup img,.bdup .ph{width:34px;height:34px;flex:0 0 34px;border-radius:7px;object-fit:cover;background:var(--surface2);
+  display:flex;align-items:center;justify-content:center;font-size:calc(16px*var(--fs,1))}
+.dupnote{display:block;width:100%;text-align:left;font-weight:700;margin:4px 0 2px}
 .cam-count{margin:0;color:#fff;font-weight:700;font-size:calc(15px*var(--fs,1))}
 .cam-stage.flash::after{content:'';position:absolute;inset:0;background:#fff;opacity:.6;animation:camflash .25s forwards}
 @keyframes camflash{to{opacity:0}}
@@ -1121,24 +1126,109 @@ async function photoSig(blob){
   }catch(e){ return null }
 }
 /* 0（同一）〜15（真逆）。検証では同じ服の撮り直しが0.5前後、形も色も同じ別の服が0.9前後 */
+/* 服が数百着あると組み合わせが数万になるので、文字列から数値への変換は1回だけにする */
+const hexCache=new Map();
+function hexArr(str,w){
+  const key=w+str; let v=hexCache.get(key);
+  if(!v){
+    v=new Uint8Array(str.length/w);
+    for(let i=0;i<v.length;i++) v[i]=parseInt(str.substr(i*w,w),16);
+    hexCache.set(key,v);
+  }
+  return v;
+}
 function sigDist(a,b){
   if(!a||!b||a.length!==b.length) return 99;
+  const x=hexArr(a,1), y=hexArr(b,1);
   let t=0;
-  for(let i=0;i<a.length;i++) t+=Math.abs(parseInt(a[i],16)-parseInt(b[i],16));
-  return t/a.length;
+  for(let i=0;i<x.length;i++) t+=Math.abs(x[i]-y[i]);
+  return t/x.length;
 }
 const DUP_THRESHOLD = 0.9;  // これ以下を「同じ服かもしれない」とみなす。実データで調整する
+
+/* 写る位置・背景が変わっても比べられる特徴。写真の中央60%だけを見る（服は中央に撮るので背景やハンガーが入りにくい）
+   h＝色の割合（RGB各4段階の64区分・100分率）、t＝柄の細かさ（明るさの変化の強さを8段階に分けた割合）
+   色は隣の区分にも按分する。仕上げで明るさが少し変わっても、区分の境目をまたいで数字が跳ねないように */
+const FEAT_V=1;
+async function photoFeat(blob){
+  try{
+    const bmp=await loadBitmap(blob);
+    const N=64, cv=document.createElement('canvas'); cv.width=N; cv.height=N;
+    const cx=cv.getContext('2d',{willReadFrequently:true});
+    cx.imageSmoothingEnabled=true; cx.imageSmoothingQuality='high';
+    cx.drawImage(bmp,0,0,N,N);
+    if(bmp.close) bmp.close();
+    const d=cx.getImageData(0,0,N,N).data;
+    const gray=new Float32Array(N*N);
+    for(let p=0;p<N*N;p++) gray[p]=0.3*d[p*4]+0.59*d[p*4+1]+0.11*d[p*4+2];
+    const a=Math.round(N*0.2), z=Math.round(N*0.8);
+    const hist=new Array(64).fill(0), tex=new Array(8).fill(0);
+    let n=0;
+    for(let y=a;y<z;y++) for(let x=a;x<z;x++){
+      const i=(y*N+x)*4;
+      const fr=d[i]/85, fg=d[i+1]/85, fb=d[i+2]/85;
+      const r0=Math.min(2,fr|0), g0=Math.min(2,fg|0), b0=Math.min(2,fb|0);
+      const wr=fr-r0, wg=fg-g0, wb=fb-b0;
+      for(let dr=0;dr<2;dr++) for(let dg=0;dg<2;dg++) for(let db=0;db<2;db++)
+        hist[(r0+dr)*16+(g0+dg)*4+(b0+db)] += (dr?wr:1-wr)*(dg?wg:1-wg)*(db?wb:1-wb);
+      const gx=gray[y*N+x+1]-gray[y*N+x-1], gy=gray[(y+1)*N+x]-gray[(y-1)*N+x];
+      tex[Math.min(7,Math.floor(Math.hypot(gx,gy)/12))]++;
+      n++;
+    }
+    const pack=arr=>arr.map(c=>Math.round(c/n*100).toString(16).padStart(2,'0')).join('');
+    return {v:FEAT_V,h:pack(hist),t:pack(tex)};
+  }catch(e){ return null }
+}
+/* 割合どうしの重なり（0〜1）。1に近いほど同じ */
+function overlap(a,b){
+  if(!a||!b||a.length!==b.length) return 0;
+  const x=hexArr(a,2), y=hexArr(b,2);
+  let t=0;
+  for(let i=0;i<x.length;i++) t+=Math.min(x[i],y[i]);
+  return t/100;
+}
+/* 色×柄の重なりがこれ以上なら候補。実際の写真10着（同じカテゴリどうし）で、
+   同じチェックシャツの平置きとハンガー掛けが0.81（仕上げをかけ直しても0.73）、
+   別の服は青の半袖と長袖が0.77で候補に入り、その次は0.66以下だった。まだ10着で決めた値なので、使いながら調整する */
+const DUP_FEAT=0.7;
+/* 同じ服かもしれない度合い。候補でなければ null、小さいほど似ている */
+function dupScore(a,b){
+  if(a.category&&b.category&&a.category!==b.category) return null;
+  const px=(a.sig&&b.sig)?sigDist(a.sig,b.sig):99;
+  if(px<=DUP_THRESHOLD) return px/DUP_THRESHOLD*0.3;           // 撮り直しなど、写り方までほぼ同じ
+  // 柄がはっきり違う（無地とチェックなど）ときは、色が近くても別の服とみなす
+  if(a.pattern&&b.pattern&&a.pattern!==b.pattern) return null;
+  const f=overlap(a.feat?.h,b.feat?.h)*overlap(a.feat?.t,b.feat?.t);
+  return f>=DUP_FEAT ? 1-f : null;
+}
+function notDupPair(a,b){ return (a.notDup||[]).includes(b.id)||(b.notDup||[]).includes(a.id) }
 function dupCandidates(d){
-  if(!d?.sig) return [];
+  if(!d?.sig&&!d?.feat) return [];
   const skip=new Set(d.dupDismissed||[]);
   return S.items
-    .filter(i=>isActive(i)&&i.sig&&!skip.has(i.id))
-    .filter(i=>!d.category||!i.category||i.category===d.category)
-    .map(i=>({i, dist: sigDist(d.sig,i.sig) - (d.memberId&&i.memberId===d.memberId ? 0.05 : 0)}))
-    .filter(x=>x.dist<=DUP_THRESHOLD)
+    .filter(i=>isActive(i)&&(i.sig||i.feat)&&!skip.has(i.id))
+    .map(i=>({i, dist: dupScore(d,i)}))
+    .filter(x=>x.dist!=null)
+    .map(x=>({...x, dist:x.dist-(d.memberId&&x.i.memberId===d.memberId ? 0.05 : 0)}))
     .sort((a,b)=>a.dist-b.dist)
     .slice(0,3)
     .map(x=>x.i);
+}
+/* 登録済みの服どうしで、同じ服かもしれない組 */
+let dupMemo=null;
+function dupPairs(){
+  if(dupMemo&&dupMemo.items===S.items) return dupMemo.pairs;   // 読み直すまでは同じ結果
+  const act=S.items.filter(i=>isActive(i)&&(i.sig||i.feat));
+  const out=[];
+  for(let x=0;x<act.length;x++) for(let y=x+1;y<act.length;y++){
+    const a=act[x], b=act[y];
+    if(notDupPair(a,b)) continue;
+    const sc=dupScore(a,b);
+    if(sc!=null) out.push({a,b,sc:sc-(a.memberId===b.memberId?0.05:0)});
+  }
+  out.sort((p,q)=>p.sc-q.sc);
+  dupMemo={items:S.items,pairs:out};
+  return out;
 }
 /* ブラウザに「このデータは消さないで」と申請する */
 async function requestPersist(){
@@ -1150,13 +1240,16 @@ async function requestPersist(){
   }catch(e){ S._persisted=false }
 }
 async function backfillHashes(){
+  let n=0;
   for(const it of S.items){
-    if(it.sig||!it.photoId) continue;
+    if((it.sig&&it.feat?.v===FEAT_V)||!it.photoId) continue;
     const p=await dbGet('photos',it.photoId);
     if(!p) continue;
-    const h=await photoSig(p.blob);
-    if(h){ it.sig=h; await dbPut('items',it) }
+    if(!it.sig) it.sig=await photoSig(p.blob);
+    if(it.feat?.v!==FEAT_V) it.feat=await photoFeat(p.blob);
+    await dbPut('items',it); n++;
   }
+  if(n){ dupMemo=null; if(S.view==='closet') renderCloset() }     // 重複のお知らせを出し直す
 }
 /* 並び順。IDは作成時刻から始まるので、IDで比べれば同じ日に登録した服も正しく並ぶ */
 const SORTS=[
@@ -1600,7 +1693,9 @@ function renderCloset(){
       <button class="btn" data-go="add">服を登録する</button></div>`;
     return;
   }
-  $('#closet-body').innerHTML=`<div class="grid" id="closet-grid"></div>
+  const dupN=dupPairs().length;
+  $('#closet-body').innerHTML=`${dupN?`<button class="note amber dupnote" data-dupreview>同じ服かもしれない組が${dupN}組あります。確認する ›</button>`:''}
+    <div class="grid" id="closet-grid"></div>
     <div class="legend">
       <span>左下＝最後に着た日</span>
       <span>色が薄い＝しばらく着ていない</span>
@@ -2204,7 +2299,7 @@ async function saveDraft(keepGoing){
     purchaseApprox:!!(d.purchaseDate&&d.purchaseApprox), buyBucket:d.purchaseApprox?(d.buyBucket||null):null,
     season:d.season||[], status:'active',
     pattern:d.pattern||null, hasCharacterPrint:!!d.hasCharacterPrint,
-    sig:d.sig||null, qty:1,
+    sig:d.sig||null, feat:d.feat||null, notDup:d.dupDismissed?.length?[...d.dupDismissed]:undefined, qty:1,
     wearCount:0, lastWorn:null, addedAt:today()
   };
   await dbPut('items',it);
@@ -2346,7 +2441,20 @@ function startBatch(){
   if(S.view!=='add') go('add'); else renderAdd();
 }
 function batchSizeOf(it,m){ return it.size ?? (it.category==='shoes' ? '' : (m?.currentSize ?? '')) }
+/* 登録済みの服か、この一覧で先に撮った服に似ていれば、その相手を返す */
+function batchDup(it){
+  const b=S.batch; if(!b) return null;
+  const me={...it,memberId:b.mid};
+  const c=dupCandidates(me)[0];
+  if(c) return {item:c};
+  for(const o of b.list){
+    if(o===it) break;
+    if(!it.dupDismissed.includes('b:'+o.k) && dupScore(me,o)!=null) return {row:o};
+  }
+  return null;
+}
 function batchRow(it,m){
+  const dup=batchDup(it);
   const sz=String(batchSizeOf(it,m)??'');
   const opts=[...(it.category==='shoes' ? SHOE_SIZES : isKidMember(m) ? [...KID_SIZES,...ADULT_SIZES] : [...ADULT_SIZES,...KID_SIZES]), FREE_SIZE];
   if(sz && !opts.includes(sz)) opts.unshift(sz);
@@ -2367,6 +2475,9 @@ function batchRow(it,m){
       </select>
       <span class="bst ${it.st}">${col?`<i class="sw" style="background:${col.hex}"></i>${esc(col.n)}・`:''}${st}
         ${it.st==='err'?`<button class="linkish" data-bretry="${it.k}">もう一度</button>`:''}</span>
+      ${dup?`<button class="bdup" data-bdup="${it.k}">
+        ${dup.item?`<span class="ph" data-photo="${dup.item.photoId||''}">${catOf(dup.item.category).g}</span>`:`<img src="${dup.row.url}" alt="">`}
+        <span>${dup.item?'登録済みの服と似ています':'この一覧に似た写真があります'}。確認する ›</span></button>`:''}
     </div>
     <button class="bdel" data-bdel="${it.k}" aria-label="この服を外す">✕</button>
   </div>`;
@@ -2398,6 +2509,7 @@ function renderBatch(){
     <button class="btn sub" id="batch-cancel">やめる</button>
     <button class="btn" id="batch-save"></button>
   </div>`;
+  hydratePhotos($('#add-body'));
   batchChrome();
 }
 /* 件数と登録ボタンだけを更新する（選んでいる最中の欄を描き直さない） */
@@ -2413,15 +2525,18 @@ function batchChrome(){
 function batchRefresh(it){
   if(!S.batch||S.view!=='add') return;
   const row=$('#br-'+it.k);
-  if(row && !row.contains(document.activeElement)) row.outerHTML=batchRow(it,memberOf(S.batch.mid));
+  if(row && !row.contains(document.activeElement)){
+    row.outerHTML=batchRow(it,memberOf(S.batch.mid));
+    hydratePhotos($('#br-'+it.k));
+  }
   batchChrome();
 }
 async function addBatchPhoto(src){
   const b=S.batch; if(!b) return;
   try{
     const {blob,color}=await processPhoto(src);
-    const sig=await photoSig(blob);
-    b.list.push({k:uid(),blob,sig,url:URL.createObjectURL(blob),color:color||null,
+    const sig=await photoSig(blob), feat=await photoFeat(blob);
+    b.list.push({k:uid(),blob,sig,feat,dupDismissed:[],url:URL.createObjectURL(blob),color:color||null,
       st:S.settings.aiMode!=='off'?'wait':'skip'});
   }catch(e){ toast('読み込めない写真がありました'); return }
   if(S.batch===b && S.view==='add') renderBatch();
@@ -2472,12 +2587,16 @@ async function saveBatch(){
   if(room<=0) return openLimit('items');
   const m=memberOf(b.mid), take=b.list.slice(0,room);
   const btn=$('#batch-save'); if(btn){ btn.disabled=true; btn.textContent='登録しています…' }
+  const idOf=new Map(take.map(it=>[it.k,uid()]));
   for(const it of take){
     const photoId=uid();
+    // 「別の服です」と答えた相手は、あとで重複の見直しに出さない
+    const notDup=it.dupDismissed.map(x=>x.startsWith('b:')?idOf.get(x.slice(2)):x).filter(Boolean);
     await dbPut('photos',{id:photoId,blob:it.blob});
     try{ await dbPut('thumbs',{id:photoId,blob:await makeThumb(it.blob)}) }catch(e){}
     await dbPut('items',{
-      id:uid(), memberId:b.mid, category:it.category, photoId,
+      id:idOf.get(it.k), memberId:b.mid, category:it.category, photoId, feat:it.feat||null,
+      notDup:notDup.length?notDup:undefined,
       size:String(batchSizeOf(it,m)??''), color:it.color||null, brand:null, price:null,
       purchaseDate:null, purchaseApprox:false, buyBucket:null,
       season:it.season||[], status:'active',
@@ -2494,6 +2613,88 @@ async function saveBatch(){
   S.batch=null;
   go('closet');
 }
+async function openBatchDup(k){
+  const b=S.batch, it=b?.list.find(x=>x.k===k); if(!it) return;
+  const dup=batchDup(it); if(!dup){ closeSheet(); return batchRefresh(it) }
+  let other, info='';
+  if(dup.item){
+    const u=await photoURL(dup.item.photoId), m=memberOf(dup.item.memberId);
+    other=u?`<img src="${u}" alt="">`:`<div class="ph">${catOf(dup.item.category).g}</div>`;
+    info=`${esc(m?m.name:'')}・${esc([catOf(dup.item.category).n,dup.item.size?sizeLabel(dup.item.size):'',dup.item.color].filter(Boolean).join(' '))}・今 ${dup.item.qty||1}枚`;
+  }else other=`<img src="${dup.row.url}" alt="">`;
+  const tgt=dup.item?dup.item.id:'b:'+dup.row.k;
+  openSheet(`
+  <div class="shead"><h3>同じ服ですか？</h3><button class="x" data-close>閉じる</button></div>
+  <div class="duppair">
+    <figure><img src="${it.url}" alt=""><figcaption>今撮った写真</figcaption></figure>
+    <figure>${other}<figcaption>${dup.item?'登録済み':'この一覧で先に撮った写真'}</figcaption></figure>
+  </div>
+  ${info?`<p class="tiny muted" style="margin:0 0 6px">${info}</p>`:''}
+  <div class="act col">
+    <button class="btn wide" data-bdupact="${k}|same|${tgt}">${dup.item?'同じ服です（登録しない）':'同じ服です（今撮った方を外す）'}</button>
+    ${dup.item?`<button class="btn sub wide" data-bdupact="${k}|more|${tgt}">同じ服をもう1枚持っている</button>`:''}
+    <button class="btn ghost wide" data-bdupact="${k}|diff|${tgt}">別の服です</button>
+  </div>
+  <div class="sp"></div>`);
+}
+async function batchDupAct(k,act,tgt){
+  const b=S.batch, i=b?b.list.findIndex(x=>x.k===k):-1; if(i<0) return closeSheet();
+  const it=b.list[i];
+  if(act==='diff') it.dupDismissed.push(tgt);
+  else{
+    if(it.st==='busy'){ closeSheet(); return toast('AIの判別が終わってから外せます') }
+    if(act==='more'){ const x=S.items.find(y=>y.id===tgt); if(x){ x.qty=(x.qty||1)+1; await dbPut('items',x); await reload() } }
+    URL.revokeObjectURL(it.url); b.list.splice(i,1);
+    toast(act==='more'?'枚数を1枚増やしました':'一覧から外しました');
+  }
+  closeSheet(); renderBatch();
+}
+
+/* ---- 登録済みの服どうしの重複を見直す ---- */
+async function openDupReview(){
+  const pairs=dupPairs();
+  if(!pairs.length){ closeSheet(); toast('同じ服かもしれない組はもうありません'); return renderCloset() }
+  const {a,b}=pairs[0];
+  const card=async it=>{
+    const u=await photoURL(it.photoId), m=memberOf(it.memberId);
+    return `<figure>${u?`<img src="${u}" alt="">`:`<div class="ph">${catOf(it.category).g}</div>`}
+      <figcaption>${esc(m?m.name:'')}・${esc([catOf(it.category).n,it.size?sizeLabel(it.size):''].filter(Boolean).join(' '))}<br>
+      着た ${it.wearCount||0}回・${it.qty||1}枚</figcaption></figure>`;
+  };
+  const ids=`${a.id}|${b.id}`;
+  openSheet(`
+  <div class="shead"><h3>同じ服ですか？</h3><button class="x" data-close>あとで</button></div>
+  <p class="tiny muted" style="margin:0 0 10px">写真が似ている組です${pairs.length>1?`（ほかに${pairs.length-1}組）`:''}。</p>
+  <div class="duppair">${await card(a)}${await card(b)}</div>
+  <div class="act col">
+    <button class="btn wide" data-dupmerge="${ids}|same">同じ服です（1つにまとめる）</button>
+    <button class="btn sub wide" data-dupmerge="${ids}|more">同じ服を2枚持っている（1つにまとめて枚数を足す）</button>
+    <button class="btn ghost wide" data-dupmerge="${ids}|diff">別の服です</button>
+  </div>
+  <p class="tiny muted" style="margin:10px 0 0">まとめるときは先に登録した方を残し、着た記録も移します。</p>
+  <div class="sp"></div>`);
+}
+/* 2着を1着にまとめる。先に登録した方を残し、着た記録・空いている項目・枚数を移す */
+async function mergeItems(a,b,addQty){
+  const [keep,drop]=String(a.id)<String(b.id)?[a,b]:[b,a];
+  for(const w of S.wears.filter(w=>w.itemId===drop.id)){
+    if(S.wears.some(x=>x.itemId===keep.id&&x.date===w.date)) await dbDel('wears',w.id);
+    else{ w.itemId=keep.id; await dbPut('wears',w) }
+  }
+  await reload();
+  const k=S.items.find(i=>i.id===keep.id);
+  const dates=S.wears.filter(w=>w.itemId===k.id).map(w=>w.date).sort();
+  k.wearCount=dates.length; k.lastWorn=dates.length?dates[dates.length-1]:null;
+  if(addQty) k.qty=(k.qty||1)+(drop.qty||1);
+  for(const f of ['brand','price','purchaseDate','buyBucket','color','pattern']) if(k[f]==null&&drop[f]!=null) k[f]=drop[f];
+  if(!k.photoId&&drop.photoId){ k.photoId=drop.photoId; k.sig=drop.sig; k.feat=drop.feat }
+  else if(drop.photoId&&drop.photoId!==k.photoId){ await dbDel('photos',drop.photoId); await dbDel('thumbs',drop.photoId) }
+  k.notDup=[...new Set([...(k.notDup||[]),...(drop.notDup||[])])];
+  await dbPut('items',k); await dbDel('items',drop.id);
+  await reload();
+  return k;
+}
+
 function cancelBatch(){
   const b=S.batch; if(!b) return;
   if(b.list.length && !confirm(`撮った${b.list.length}着を、登録せずに消します。よろしいですか？`)) return;
@@ -2563,9 +2764,9 @@ async function acceptPhoto(source){
   if(lab) lab.innerHTML='<span class="g">⏳</span><span>仕上げています…</span>';
   try{
     const {blob,color}=await processPhoto(source);
-    const sig=await photoSig(blob);
+    const sig=await photoSig(blob), feat=await photoFeat(blob);
     if(S.draft?.photoURL) URL.revokeObjectURL(S.draft.photoURL);
-    S.draft={...(S.draft||{}),blob,sig,dupDismissed:[],photoURL:URL.createObjectURL(blob),
+    S.draft={...(S.draft||{}),blob,sig,feat,dupDismissed:[],photoURL:URL.createObjectURL(blob),
       color:S.draft?.autoColor===false?S.draft.color:(color||S.draft?.color),
       autoColor:S.draft?.autoColor===false?false:!!color,
       aiDone:false,aiError:null,pattern:null,hasCharacterPrint:false};
@@ -2574,7 +2775,7 @@ async function acceptPhoto(source){
   if(S.settings.aiMode==='auto' && S.draft?.blob) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wpick],[data-batch],[data-bmem],[data-bdel],[data-bretry],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-step],[data-wearon],[data-fontscale],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#batch-cam,#batch-pick,#batch-save,#batch-cancel,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wpick],[data-batch],[data-bmem],[data-bdel],[data-bretry],[data-bdup],[data-bdupact],[data-dupreview],[data-dupmerge],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-step],[data-wearon],[data-fontscale],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#batch-cam,#batch-pick,#batch-save,#batch-cancel,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
@@ -2650,6 +2851,18 @@ document.addEventListener('click',async e=>{
     URL.revokeObjectURL(b.list[i].url); b.list.splice(i,1); return renderBatch();
   }
   if(g('data-bretry')){ const it=S.batch?.list.find(x=>x.k===g('data-bretry')); if(it){ it.st='wait'; pumpBatchAi() } return }
+  if(g('data-bdup')) return openBatchDup(g('data-bdup'));
+  if(g('data-bdupact')){ const [k,act,...rest]=g('data-bdupact').split('|'); return batchDupAct(k,act,rest.join('|')) }
+  if(t.hasAttribute('data-dupreview')) return openDupReview();
+  if(g('data-dupmerge')){
+    const [aid,bid,act]=g('data-dupmerge').split('|');
+    const a=S.items.find(i=>i.id===aid), b=S.items.find(i=>i.id===bid);
+    if(!a||!b) return openDupReview();
+    if(act==='diff'){ a.notDup=[...new Set([...(a.notDup||[]),b.id])]; await dbPut('items',a); await reload() }
+    else{ const k=await mergeItems(a,b,act==='more'); toast(act==='more'?`1つにまとめて${k.qty}枚にしました`:'1つにまとめました') }
+    render();
+    return openDupReview();
+  }
   if(t.id==='batch-cam') return openCamera(true);
   if(t.id==='batch-pick') return $('#batch-file').click();
   if(t.id==='batch-save') return saveBatch();
