@@ -231,6 +231,12 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .fc-head{display:flex;flex-direction:column;gap:2px;padding-bottom:10px;border-bottom:1px solid var(--line2);margin-bottom:6px}
 .fc-head b{font-size:calc(15px*var(--fs,1));font-weight:700}
 .fc-head span{font-size:calc(11.5px*var(--fs,1));color:var(--ink2);font-variant-numeric:tabular-nums}
+.aiuse{display:flex;flex-direction:column;gap:2px}
+.aiuse span{font-size:calc(12.5px*var(--fs,1));color:var(--ink2)}
+.aiuse b{font-size:calc(24px*var(--fs,1));font-weight:700}
+.aiuse b small{font-size:calc(14px*var(--fs,1));font-weight:500;color:var(--ink2)}
+.aiuse em{font-style:normal;font-size:calc(13px*var(--fs,1));color:var(--ink2)}
+.aiuse em.amber{color:var(--amber);font-weight:700}
 .fc-row{display:flex;align-items:baseline;gap:10px;padding:7px 0}
 .fc-row b{font-size:calc(15px*var(--fs,1));font-weight:700;min-width:58px}
 .fc-row span{font-size:calc(12.5px*var(--fs,1));color:var(--ink2);flex:1}
@@ -362,7 +368,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .iv-steps li{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);
   border-radius:14px;padding:12px 14px;font-weight:700;text-align:left;font-size:calc(15px*var(--fs,1))}
 .iv-steps i{flex:0 0 28px;height:28px;border-radius:14px;background:#FFE7A8;color:#16324A;font-style:normal;display:flex;align-items:center;justify-content:center}
-.intro .nb{display:inline-block}
+.nb{display:inline-block}
 .intro-s,.intro-d,.intro-slide h2{text-wrap:balance}
 .intro-more{margin-top:12px;color:#fff;font-weight:700;text-decoration:underline;min-height:44px;padding:8px 12px}
 .iv-tiles,.iv-pair{display:flex;gap:8px;margin:6px 0 8px}
@@ -397,6 +403,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .diagcard .diagrow.out span{color:var(--danger)}
 .diagcard .diagrow.soon span{color:var(--amber)}
 .diagcard .diagrow.ok span{color:var(--ok)}
+.diagcard .diagrow.year span{color:#C0651A}
 .cam-count{margin:0;color:#fff;font-weight:700;font-size:calc(15px*var(--fs,1));text-align:center;line-height:1.6;padding:0 16px}
 .cam-stage.flash::after{content:'';position:absolute;inset:0;background:#fff;opacity:.6;animation:camflash .25s forwards}
 @keyframes camflash{to{opacity:0}}
@@ -1088,6 +1095,12 @@ function fitSizeText(h){
   const f=fitSize(h);
   return f ? `今ちょうど良いのは ${f}cm です。` : '子供服の最大サイズを超えています。大人サイズを選んでください。';
 }
+/* 1年後の今ごろの身長と、そのときちょうど良いサイズ。セールで先に買っておく目安にする */
+function nextYear(m){
+  const g=growthInfo(m); if(!g||!isKidMember(m)) return null;
+  const h=g.nowH+g.rate, f=fitSize(h+SIZE_MARGIN/2);   // 1年後に少し余裕のあるサイズ
+  return {h, size:f};
+}
 /* そのサイズがあと何ヶ月着られるか。すでに越えていれば負の値 */
 function monthsLeft(m,size){
   const g=growthInfo(m); if(!g) return null;
@@ -1192,6 +1205,7 @@ function forecastCard(m){
   }
   return `<div class="card fc-card">${head}<span>${age}歳・推定 ${g.nowH.toFixed(0)}cm・年 ${g.rate.toFixed(1)}cm（${g.source}）</span></div>
     ${body}
+    ${(()=>{ const ny=nextYear(m); return ny&&ny.size?`<div class="note indigo tiny" style="margin-top:10px">🛍 <span class="nb">来年の今ごろは</span><span class="nb">約${ny.h.toFixed(0)}cm。</span><span class="nb">シーズンオフの</span><span class="nb">セールで買うなら</span> <b class="nb">${ny.size}サイズ</b><span class="nb">が目安です。</span></div>`:'' })()}
     <div class="tiny muted" style="margin-top:10px">${fitSizeText(g.nowH)}${g.source==='平均'?'身長を2回以上記録すると、この子の実際のペースで計算します。':''}</div>
   </div>`;
 }
@@ -1556,7 +1570,8 @@ const INTRO=[
   {g:'📏', t:'サイズアウトを先読み', s:'身長から、|服ごとに|「あと何か月」',
    v:`<div class="iv-card"><div class="iv-row"><b>🔴 もう小さい服</b><em class="r">3着</em></div>
       <div class="iv-row"><b>🟡 あと3か月以内</b><em class="a">5着</em></div>
-      <div class="iv-row"><b>🟢 まだ着られる</b><em class="o">34着</em></div></div>`,
+      <div class="iv-row"><b>🟠 1年以内</b><em class="a">8着</em></div>
+      <div class="iv-row"><b>🟢 まだ着られる</b><em class="o">26着</em></div></div>`,
    d:'登録が終わると|すぐに診断。<br>「ああ、確かに|もう小さいかも」が|分かります。'},
   {g:'🎁', t:'おさがり・手放す', s:'下の子へ、|フリマへ。<br>迷わず回せる',
    v:`<div class="iv-card"><div class="iv-note ok">👕 あさひくんが今ちょうど着られます</div>
@@ -1571,7 +1586,7 @@ const INTRO=[
 const GUIDE=[
   {g:'👀', t:'今日の服は撮るだけ', s:'着ている服を撮ると、<br>登録済みの服から|探します',
    v:`<div class="iv-card"><div class="iv-row"><b>この服を着ていますか？</b></div>
-      <div class="iv-tiles"><span>👕<em>確度 92%</em></span><span>👖<em>確度 85%</em></span><span>🧥<em>確度 61%</em></span></div>
+      <div class="iv-tiles"><span>👕<em>マッチ 92%</em></span><span>👖<em>マッチ 85%</em></span><span>🧥<em>マッチ 61%</em></span></div>
       <div class="iv-note ok">✓ 選んだ2着を記録する</div></div>`,
    d:'候補から選ぶだけで、<br>今日の記録は|おしまい。<br>写っているのに|未登録の服も、<br>その場で|登録できます。'},
   {g:'🗓', t:'着た記録からわかること', s:'よく着る服、|眠っている服',
@@ -1725,7 +1740,7 @@ function renderOutfit(){
       <div class="grid" id="opick-grid"></div>`;
   }else{
     const tiles=o.found.map(w=>{ const it=S.items.find(i=>i.id===w.id); if(!it) return '';
-      return tile(it, done(it)?'記録済み':'確度 '+Math.round((w.confidence||0)*100)+'%') }).join('');
+      return tile(it, done(it)?'記録済み':'マッチ '+Math.round((w.confidence||0)*100)+'%') }).join('');
     body=`<p class="tiny muted" style="margin:0 0 10px">${esc(m?.name||'')}さんの服から見つけました。タップで選択を切り替えられます（${esc(fmtMD(o.day))}の記録）。</p>
       ${o.found.length?`<div class="grid" style="margin-top:0">${tiles}</div>`
         :`<div class="note amber">登録済みの服の中に、当てはまるものが見つかりませんでした。</div>`}`;
@@ -2129,10 +2144,13 @@ function renderSet(){
     </div>
     <div class="act"><button class="btn ghost sm" id="save-api">接続を確認する</button></div>
     <div class="hr"></div>
-    ${welcome()?`<div class="fc-row"><b>${welcome().used} / ${WELCOME_AI}</b>
-      <span>はじめての30日の判別回数</span>`:`<div class="fc-row"><b>${usageNow().count} / ${plan().ai}</b>
-      <span>今月の判別回数</span>`}
-      <em class="${aiRemaining()<=0?'amber':'indigo'}">${aiRemainLabel()}</em></div>
+    <div class="aiuse">
+      <span>${welcome()?'はじめての30日に使った回数':'今月使った回数'}</span>
+      <b class="num">${welcome()?welcome().used:usageNow().count}<small> / ${welcome()?WELCOME_AI:plan().ai}回</small></b>
+      <em class="${aiRemaining()<=0?'amber':''}">${(()=>{ const w=welcome(), k=packLeft();
+        return (w?`残り${w.left}回（${fmtMD(ymd(new Date(w.end-1))).replace(/（.）/,'')}まで。そのあとは毎月${plan().ai}回）`
+                 :`残り${monthlyLeft()}回（毎月1日に戻ります）`)+(k?`　＋回数パック${k}回`:'') })()}</em>
+    </div>
     <p class="tiny muted" style="margin:10px 0 0">写真で記録も1回として数えます。</p>
   </div>`;
 
@@ -2869,15 +2887,17 @@ async function batchDupAct(k,act,tgt){
 /* ---- 診断結果。まとめて登録のあとに、その人の服を「もう小さい／もうすぐ／まだ着られる」に分けて見せる ---- */
 function diagnose(m){
   const items=S.items.filter(i=>isActive(i)&&i.memberId===m.id);
-  const out=[], soon=[], ok=[], nosize=[], hand=[];
+  const out=[], soon=[], year=[], ok=[], nosize=[], hand=[];
   for(const it of items){
     const s=sizeNum(it.size);
     if(s===null){ nosize.push(it); continue }
     if(isOutgrown(it)){ out.push(it); const to=handDownTarget(it); if(to) hand.push({it,to}); continue }
     const mo=monthsLeft(m,s);
-    if(mo!==null&&mo<=3) soon.push(it); else ok.push(it);
+    if(mo!==null&&mo<=3) soon.push(it);
+    else if(mo!==null&&mo<=12) year.push(it);
+    else ok.push(it);
   }
-  return {items,out,soon,ok,nosize,hand};
+  return {items,out,soon,year,ok,nosize,hand};
 }
 function diagTiles(list,label){
   return `<div class="grid" style="margin-top:8px">${list.map(it=>`<button class="tile" data-item="${it.id}">
@@ -2896,7 +2916,7 @@ function renderDiag(){
     body=`<div class="note amber">身長が入っていないので診断できません。
       <button class="linkish" data-member="${m.id}" style="display:block;margin-top:6px">${esc(m.name)}さんの身長を入れる</button></div>`;
   }else{
-    const mo=it=>{ const v=monthsLeft(m,sizeNum(it.size)); return sizeLabel(it.size)+'・'+(monthsLabel(v)||'') };
+    const mo=it=>{ const v=monthsLeft(m,sizeNum(it.size)); return v!==null&&v>0?`あと${Math.max(1,Math.round(v))}か月`:sizeLabel(it.size) };
     body=`<p class="tiny muted" style="margin:0 0 10px">${esc(m.name)}さん・${ageOf(m)??'?'}歳・今の身長 約${g.nowH.toFixed(0)}cm
       ${g.est?'（年齢の平均から推定。測って入れると正確になります）':''}</p>
       <div class="diagrow out"><b>🔴 もう小さい服</b><span class="num">${r.out.length}着</span></div>
@@ -2905,6 +2925,9 @@ function renderDiag(){
         ${[...new Set(r.hand.map(h=>h.to.name))].map(esc).join('・')}さんが今ちょうど着られます。</div>`:''}
       <div class="diagrow soon"><b>🟡 あと3か月以内に小さくなる</b><span class="num">${r.soon.length}着</span></div>
       ${r.soon.length?diagTiles(r.soon,mo):'<p class="tiny muted" style="margin:6px 2px 0">ありません。</p>'}
+      <div class="diagrow year"><b>🟠 1年以内に小さくなる</b><span class="num">${r.year.length}着</span></div>
+      ${r.year.length?diagTiles(r.year,mo):'<p class="tiny muted" style="margin:6px 2px 0">ありません。</p>'}
+      ${(()=>{ const ny=nextYear(m); return ny&&ny.size?`<div class="note indigo" style="margin-top:10px">🛍 <span class="nb">来年の今ごろは</span><span class="nb">約${ny.h.toFixed(0)}cm。</span><span class="nb">シーズンオフの</span><span class="nb">セールで</span><span class="nb">買っておくなら</span> <b class="nb">${ny.size}サイズ</b><span class="nb">が目安です。</span></div>`:'' })()}
       <div class="diagrow ok"><b>🟢 まだ着られる</b><span class="num">${r.ok.length}着</span></div>
       ${r.nosize.length?`<p class="tiny muted" style="margin:10px 2px 0">サイズが入っていない服が${r.nosize.length}着あります（くつ・小物など）。</p>`:''}`;
   }
