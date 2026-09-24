@@ -384,6 +384,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .intro-dots i.on{width:22px;background:#fff}
 .intro-next{background:rgba(255,255,255,.18);color:#fff!important;border:1px solid rgba(255,255,255,.4)}
 .cam-hint{font-weight:600;color:#FFE7A8;font-size:calc(13.5px*var(--fs,1))}
+.aioffnote{display:block;width:100%;margin-top:8px;text-align:left;background:var(--surface);color:var(--ink2);border:1px dashed var(--line)}
 .steps{margin-bottom:14px;border:2px solid var(--indigo)}
 .step{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line2);opacity:.55}
 .step:first-of-type{border-top:none}
@@ -1503,7 +1504,9 @@ function renderToday(){
     <button class="btn sub wide pickbtn" data-wpick>👕 服を選んで記録する<span class="num" style="font-weight:500;color:var(--ink2)">（${mineN}着）</span></button>
     ${S.settings.aiMode!=='off'?`
       <button class="btn wide shootbtn" id="outfit-shot">📷 着ている服を撮って記録</button>
-      <div class="tiny muted center" style="margin-top:6px">${esc(m.name)}さんの服から探します・${aiRemainLabel()}</div>`:''}
+      <div class="tiny muted center" style="margin-top:6px">${esc(m.name)}さんの服から探します・${aiRemainLabel()}</div>`
+    // AIを使わない設定のときも、ボタンが消えたと思われないよう案内だけ出す
+    :`<button class="note tiny aioffnote" data-go="set">📷 <span class="nb">着ている服を撮って</span><span class="nb">記録するには、</span><span class="nb">設定の「AIで判別」を</span><span class="nb">「ボタンを押したとき」に</span><span class="nb">してください ›</span></button>`}
   </div>`;
 
   h+=`<div class="homerest">`;
