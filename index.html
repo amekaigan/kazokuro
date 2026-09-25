@@ -1690,14 +1690,14 @@ function backupCard(){
   const d=backupDue(); if(!d) return '';
   return `<div class="note amber backupnote">
     <b>📦 ${d.last?`最後の書き出しから${Math.floor((Date.now()-d.last)/86400000)}日たちました`:'まだバックアップしていません'}</b>
-    <span class="nb">服${d.n}着の記録と写真は、</span><span class="nb">このスマホの中だけにあります。</span><span class="nb">機種変更や故障に備えて、</span><span class="nb">写真ごと書き出しておきましょう。</span>
+    ${phr(`服${d.n}着の|記録と写真は、|このスマホの|中だけに|あります。|機種変更や|故障に|備えて、|写真ごと|書き出して|おきましょう。`)}
     <div class="act" style="margin-top:8px"><button class="btn sm" data-backupnow>写真ごと書き出す</button>
       <button class="btn ghost sm" data-backuplater>あとで</button></div>
   </div>`;
 }
 function batchResumeCard(){
   const b=S.batch; if(!b||!b.list.length) return '';
-  return `<button class="note indigo resumenote" data-go="add">📚 <span class="nb">まとめて登録の途中が</span><span class="nb">${b.list.length}着あります。</span><b class="nb">続ける ›</b></button>`;
+  return `<button class="note indigo resumenote" data-go="add">📚 ${phr(`まとめて|登録の|途中が|${b.list.length}着|あります。`)}<b class="nb">続ける ›</b></button>`;
 }
 
 /* はじめの3ステップ。家族 → まとめて登録 → 診断結果 の順に案内し、全部終わったら出さない */
