@@ -388,6 +388,8 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .backupnote,.resumenote{display:block;width:100%;text-align:left;margin-bottom:12px}
 a.btn{text-decoration:none}
 a:not(.btn){color:var(--indigo)}
+.legal{display:flex;flex-wrap:wrap;gap:6px 18px;margin:14px 0 0;font-size:calc(14px*var(--fs,1))}
+.legal a{font-weight:600;padding:6px 0}
 .consent{margin:0 0 12px;padding-left:1.2em;font-size:calc(14px*var(--fs,1));line-height:1.7}
 .consent li{margin-bottom:6px}
 .backupnote b{display:block;margin-bottom:2px}
@@ -577,7 +579,8 @@ function sizeChips(id, attr, selected, kid, cat, m){
       <button class="chip more" data-sizemore="${id}" data-more="${more}">${open?'閉じる':'＋'+more}</button></div>
     <div class="chips g5 sizes-more" id="${id}-more" ${open?'':'hidden'}>${other.map(chip).join('')}</div>`;
 }
-const API_BASE = 'https://kazokuro-api.ishimonzukan.workers.dev';  // AI判別を中継するWorker
+const API_BASE = 'https://kazokuro-api.ishimonzukan.workers.dev';
+const CONTACT_MAIL = 'kazokuroinfo@gmail.com';   // お問い合わせ先。ドメインを取ったら、privacy.html・terms.html と一緒に変える  // AI判別を中継するWorker
 const STALE_DAYS = 120;      // これ以上着ていなければ「眠っている服」
 const MERCARI_MIN = 300;
 const SIZE_MARGIN = 5;       // 「110サイズ」は身長115cmくらいまで着られる、という目安
@@ -2295,10 +2298,11 @@ function renderSet(){
     子どものサイズアウトを、手遅れになる前に教えるアプリです。<br><br>
     身長の記録が2回以上あると、その子の実際の成長ペースで予測します。<br>
     コーデ提案は、服のデータが貯まってから追加する予定です。
-    <div class="act"><button class="btn sub wide" data-intro>アプリの説明をもう一度見る</button>
-      <button class="btn sub wide" data-guide>機能ガイド（くわしい使い方）</button></div>
-    <div class="act"><a class="btn ghost sm" href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
-      <a class="btn ghost sm" href="terms.html" target="_blank" rel="noopener">利用規約</a></div>
+    <div class="act"><button class="btn sub wide" data-intro><span style="text-align:center">${phr('アプリの説明を|もう一度見る')}</span></button>
+      <button class="btn sub wide" data-guide><span style="text-align:center">${phr('機能ガイド|（使い方）')}</span></button></div>
+    <p class="legal"><a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
+      <a href="terms.html" target="_blank" rel="noopener">利用規約</a>
+      <a href="mailto:${CONTACT_MAIL}?subject=${encodeURIComponent('家族ローゼットについて（v'+APP_VERSION+'）')}">お問い合わせ</a></p>
   </div>`;
   $('#set-body').innerHTML=h;
 }
