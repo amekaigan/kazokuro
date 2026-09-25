@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#E8ECEE">
+<title>プライバシーポリシー｜家族ローゼット</title>
+<style>
+:root{
+  --bg:#E8ECEE; --surface:#FFFFFF; --ink:#16323B; --ink2:#5C7480; --line:#D5DDE0;
+  --indigo:#24557A; --indigo-bg:#E4EDF4;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#101A1E; --surface:#182529; --ink:#E4EDEF; --ink2:#9AB0B8; --line:#2A3B41;
+    --indigo:#7FB0D6; --indigo-bg:#1C3243;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  font-size:15px;line-height:1.8}
+main{max-width:720px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top,0px)) 16px calc(40px + env(safe-area-inset-bottom,0px))}
+.back{display:inline-block;color:var(--indigo);text-decoration:none;font-weight:700;margin-bottom:12px}
+h1{font-size:24px;line-height:1.4;margin:0 0 4px}
+.date{color:var(--ink2);font-size:13px;margin:0 0 20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 18px 8px;margin-bottom:14px}
+h2{font-size:17px;line-height:1.5;margin:0 0 8px}
+p,ul,ol,table{margin:0 0 12px}
+ul,ol{padding-left:1.3em}
+li{margin-bottom:4px}
+.sum{background:var(--indigo-bg);border-color:transparent}
+.sum ul{padding-left:1.1em}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:8px 6px;border-top:1px solid var(--line)}
+th{white-space:nowrap;color:var(--ink2);font-weight:600;width:7.5em}
+a{color:var(--indigo)}
+.muted{color:var(--ink2);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="./">‹ アプリに戻る</a>
+<h1>プライバシーポリシー</h1>
+<p class="date">家族ローゼット（かぞクロ）　2026年9月25日 制定</p>
+
+<div class="card sum">
+  <h2>かんたんに言うと</h2>
+  <ul>
+    <li>家族の名前・誕生日・身長、服の記録と写真は、<b>あなたのスマホの中だけ</b>に保存します。運営者のサーバーには送りません。</li>
+    <li>AIで服を判別するときだけ、<b>服の写真</b>をAI（Anthropic社のClaude）に送ります。送る前に、あなたの同意をもらいます。</li>
+    <li>送った写真は運営者の側では保存しません。AIの学習にも使われません。</li>
+    <li>会員登録はありません。広告や、利用のようすを追いかける仕組み（アクセス解析）も入れていません。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>1. このポリシーについて</h2>
+  <p>家族ローゼット（かぞクロ）（以下「本アプリ」）の運営者（以下「運営者」）は、利用者の情報を次のとおり取り扱います。本アプリを使うことで、このポリシーに同意したものとします。</p>
+</div>
+
+<div class="card">
+  <h2>2. スマホの中だけに保存する情報</h2>
+  <p>次の情報は、利用者の端末（ブラウザ）の中にだけ保存されます。運営者は見ることができず、運営者のサーバーにも送られません。</p>
+  <ul>
+    <li>家族の名前（ニックネームでかまいません）、誕生日、身長の記録</li>
+    <li>服の記録（種類・色・サイズ・季節・柄・ブランド・値段・着た日など）</li>
+    <li>服の写真、着た日の写真</li>
+    <li>アプリの設定、AIの使用回数、プランの状態</li>
+  </ul>
+  <p>端末を変えたり、ブラウザのデータを消したりすると、これらの情報は失われます。設定の「バックアップ」から書き出したファイルは、利用者ご自身で保管してください。</p>
+</div>
+
+<div class="card">
+  <h2>3. AIに送る情報</h2>
+  <p>AIで服の種類や色を判別する機能（登録時の判別、まとめて登録、着ている服を撮って記録）を使うときだけ、次の情報を送ります。はじめて使うときに、送ってよいかを確認します。設定で「AIで判別」を「使わない」にすると、何も送りません。</p>
+  <table>
+    <tr><th>送るもの</th><td>服の写真（縮小したもの）。「着ている服を撮って記録」では、あわせて登録済みの服の種類・色・サイズ・柄・ブランド</td></tr>
+    <tr><th>送らないもの</th><td>家族の名前・誕生日・身長、服の値段や着た日などの記録</td></tr>
+    <tr><th>送り先</th><td>運営者が用意した中継サーバー（Cloudflare社のサービス上）を通り、Anthropic社（米国）のAI「Claude」に届きます</td></tr>
+    <tr><th>使いみち</th><td>服の種類・色・季節・柄の判別と、登録済みの服の中から着ている服を探すことだけに使います</td></tr>
+    <tr><th>保存</th><td>中継サーバーでは保存しません。Anthropic社では、同社の規約にしたがって一定期間ののちに削除されます（安全確認のために保管されることがあります）。AIの学習には使われません</td></tr>
+  </table>
+  <p>写真には、服以外のもの（人の顔、名札、住所がわかるものなど）が写らないようにしてください。</p>
+  <p class="muted">Anthropic社の取り扱いについて：<a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener">Anthropic Privacy Policy</a>／<a href="https://www.anthropic.com/legal/commercial-terms" target="_blank" rel="noopener">Commercial Terms</a>（英語）</p>
+</div>
+
+<div class="card">
+  <h2>4. 外国にある会社への提供について</h2>
+  <p>AIの判別のため、写真などを米国のAnthropic社に送ります。米国には、日本と同じ水準の個人情報保護の法律がないことがあります。Anthropic社は、送られた情報をAIの学習に使わないことや、安全に管理することを規約で定めています。本アプリが送るのは服の写真であり、名前など個人を特定する情報は送りません。</p>
+</div>
+
+<div class="card">
+  <h2>5. 通信の記録</h2>
+  <p>本アプリのページを置いているGitHub社と、AIの中継に使うCloudflare社は、通信のしくみ上、IPアドレスや接続した日時などの記録を一時的に扱います。運営者は、これらを利用者を特定する目的では使いません。</p>
+</div>
+
+<div class="card">
+  <h2>6. 有料プランの支払い</h2>
+  <p>有料プランや回数パックの支払いは、App Store・Google Playなどの決済サービスを通じて行う予定です。カード番号などの支払い情報は決済サービスが扱い、運営者は受け取りません。支払いの方法が決まったら、このポリシーに書き足します。</p>
+</div>
+
+<div class="card">
+  <h2>7. お問い合わせでいただく情報</h2>
+  <p>お問い合わせのときにいただいたメールアドレスや内容は、返信と、アプリの改善のためだけに使います。法令にもとづく場合をのぞき、ご本人の同意なく第三者に渡しません。</p>
+</div>
+
+<div class="card">
+  <h2>8. 子どもの情報について</h2>
+  <p>本アプリは、保護者の方が家族の服を管理するためのものです。子どもの名前・誕生日・身長は、端末の中だけに保存され、外部には送りません。</p>
+</div>
+
+<div class="card">
+  <h2>9. 同意の取り消し・データの削除</h2>
+  <ul>
+    <li>AIに写真を送ることへの同意は、設定の「AIで判別」からいつでも取り消せます。</li>
+    <li>端末の中のデータは、本アプリの設定から家族や服を削除するか、ブラウザのこのサイトのデータを消すと削除されます。</li>
+    <li>運営者は利用者のデータを預かっていないため、運営者の側で削除する必要のあるデータはありません（お問い合わせのメールをのぞく）。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>10. このポリシーの変更</h2>
+  <p>法令の変更や機能の追加にあわせて、このポリシーを変えることがあります。大切な変更のときは、アプリの中でお知らせします。</p>
+</div>
+
+<div class="card">
+  <h2>11. 運営者・お問い合わせ先</h2>
+  <table>
+    <tr><th>運営者</th><td>【運営者名】</td></tr>
+    <tr><th>お問い合わせ</th><td>【お問い合わせ先】</td></tr>
+  </table>
+</div>
+
+<p><a href="terms.html">利用規約</a></p>
+</main>
+</body>
+</html>

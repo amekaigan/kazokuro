@@ -386,6 +386,10 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .cam-hint{font-weight:600;color:#FFE7A8;font-size:calc(13.5px*var(--fs,1))}
 .lockpill{margin-left:8px;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.22)}
 .backupnote,.resumenote{display:block;width:100%;text-align:left;margin-bottom:12px}
+a.btn{text-decoration:none}
+a:not(.btn){color:var(--indigo)}
+.consent{margin:0 0 12px;padding-left:1.2em;font-size:calc(14px*var(--fs,1));line-height:1.7}
+.consent li{margin-bottom:6px}
 .backupnote b{display:block;margin-bottom:2px}
 .aioffnote{display:block;width:100%;margin-top:8px;text-align:left;background:var(--surface);color:var(--ink2);border:1px dashed var(--line)}
 .steps{margin-bottom:14px;border:2px solid var(--indigo)}
@@ -533,7 +537,7 @@ const MEMBER_COLORS = [
   {n:'レッド',  hex:'#B84B42'}, {n:'グレー',  hex:'#6B7B82'}
 ];
 const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
-const APP_VERSION = '0.9.2';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
+const APP_VERSION = '0.9.3';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
 const KID_SIZES = ['60','70','80','90','100','110','120','130','140','150','160'];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL'];
 const FREE_SIZE = 'F';         // フリーサイズ。数字ではないのでサイズアウト判定の対象外
@@ -1727,6 +1731,28 @@ function stepsCard(){
   </div>`;
 }
 
+/* ---------- 写真をAIに送る前の同意 ----------
+   はじめてAIを使うときに一度だけ聞く（ストアの審査でも、外部のAIに送る前の同意が求められる）。
+   同じ画面で何度呼ばれても、確認の画面は1つだけ出す */
+function aiConsent(){
+  if(S.settings.aiConsent) return Promise.resolve(true);
+  if(S._consentP) return S._consentP;
+  S._consentP=new Promise(res=>{
+    S._consentRes=res;
+    openSheet(`<div class="shead"><h3>写真をAIに送ってもいいですか？</h3><button class="x" data-close>閉じる</button></div>
+      <p style="margin:0 0 10px">服の種類や色を判別するために、撮った写真をAI（Anthropic社のClaude）に送ります。</p>
+      <ul class="consent">
+        <li>送るのは服の写真と、登録済みの服の種類・色・サイズだけ。家族の名前・誕生日・身長は送りません。</li>
+        <li>写真はこのアプリの側では保存しません。AIの学習にも使われません。</li>
+        <li>顔や名札など、服以外のものが写らないように撮ってください。</li>
+      </ul>
+      <p class="tiny muted" style="margin:0 0 4px">くわしくは<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>へ。同意は設定からいつでも取り消せます。</p>
+      <div class="act col"><button class="btn wide" data-aiconsent="yes">同意してAIを使う</button>
+        <button class="btn ghost wide" data-aiconsent="no">AIを使わない</button></div>`);
+  }).then(ok=>{ S._consentP=null; S._consentRes=null; return ok });
+  return S._consentP;
+}
+
 /* ---------- 写真で今日の服を記録 ---------- */
 async function outfitDataURL(file){
   const bmp=await loadBitmap(file);
@@ -1743,6 +1769,7 @@ async function outfitIdentify(file){
   const cands=S.items.filter(i=>isActive(i)&&i.memberId===mid);
   if(!cands.length){ toast(`${m?.name||''}さんの服がまだ登録されていません`); return }
   if(!canShootAi()) return openLimit(welcome()||plan().shot?'ai':'shot');
+  if(!await aiConsent()) return;
 
   openSheet(`<div class="shead"><h3>写真から探しています</h3><button class="x" data-close>閉じる</button></div>
     <div class="empty"><span class="g">🔍</span><p>${esc(m.name)}さんの${cands.length}着の中から探しています…</p></div>`);
@@ -2200,7 +2227,11 @@ function renderSet(){
       ${[['auto','撮ったら自動'],['button','ボタンを押したとき'],['off','使わない']].map(([v,n])=>
         `<button class="chip" data-aimode="${v}" aria-pressed="${S.settings.aiMode===v}">${n}</button>`).join('')}
     </div>
-    <div class="act"><button class="btn ghost sm" id="save-api">接続を確認する</button></div>
+    <div class="act"><button class="btn ghost sm" id="save-api">接続を確認する</button>
+      ${S.settings.aiConsent?'<button class="btn ghost sm" data-aiconsentreset>写真を送る同意を取り消す</button>':''}</div>
+    <p class="tiny muted" style="margin:10px 0 0">${S.settings.aiConsent
+      ?`写真をAIに送ることに同意しています（${fmtMD(ymd(new Date(S.settings.aiConsent))).replace(/（.）/,'')}）。`
+      :'はじめてAIを使うときに、写真を送ってよいかを確認します。'}写真の扱いは<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>へ。</p>
     <div class="hr"></div>
     <div class="aiuse">
       <span>${welcome()?'はじめての30日に使った回数':'今月使った回数'}</span>
@@ -2266,6 +2297,8 @@ function renderSet(){
     コーデ提案は、服のデータが貯まってから追加する予定です。
     <div class="act"><button class="btn sub wide" data-intro>アプリの説明をもう一度見る</button>
       <button class="btn sub wide" data-guide>機能ガイド（くわしい使い方）</button></div>
+    <div class="act"><a class="btn ghost sm" href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
+      <a class="btn ghost sm" href="terms.html" target="_blank" rel="noopener">利用規約</a></div>
   </div>`;
   $('#set-body').innerHTML=h;
 }
@@ -2280,6 +2313,7 @@ function openSheet(html){
   document.body.style.overflow='hidden';
 }
 function closeSheet(){
+  if(S._consentRes){ const r=S._consentRes; S._consentRes=null; r(false) }
   S._outfitTok=null; S._openItemId=null; S._iwd=null;
   $('#sheet').style.transform='';
   $('#sheet').classList.remove('on'); $('#scrim').classList.remove('on');
@@ -2677,6 +2711,7 @@ async function aiAnalyze(){
     toast('今月のAI判別を使い切りました');
     S.draft={...d,aiError:'limit'}; renderAdd(); return;
   }
+  if(!await aiConsent()) return;
 
   S.draft={...d,aiBusy:true,aiError:null}; renderAdd();
   try{
@@ -2735,6 +2770,7 @@ function startBatch(){
   if(!S.batch){ S.batch={mid:S.lastUsed.memberId??S.members[0].id, list:[], running:0, shooting:0, size:null}; saveBatchMeta() }
   if(!memberOf(S.batch.mid)) S.batch.mid=S.members[0].id;
   if(S.view!=='add') go('add'); else renderAdd();
+  if(S.settings.aiMode!=='off') aiConsent();
 }
 /* 選んだサイズが、その子に今どうか。撮る前・撮っている最中に一言だけ出す */
 function sizeHint(m,size){
@@ -2862,6 +2898,15 @@ async function addBatchPhoto(src){
 /* 順番待ちの服を、同時に BATCH_PARALLEL 着ずつAIに送る */
 function pumpBatchAi(){
   const b=S.batch; if(!b) return;
+  if(!S.settings.aiConsent){                // 同意がまだなら聞いてから。断られたら手で選んでもらう
+    if(b.list.some(i=>i.st==='wait')) aiConsent().then(ok=>{
+      if(S.batch!==b) return;
+      if(ok) return pumpBatchAi();
+      b.list.forEach(i=>{ if(i.st==='wait') i.st='skip' });
+      if(S.view==='add') renderBatch();
+    });
+    return;
+  }
   while(b.running<BATCH_PARALLEL){
     const it=b.list.find(i=>i.st==='wait'); if(!it) break;
     if(aiRemaining()-b.running<=0){        // 回数は成功したときに減るので、送信中の分を差し引いて見る
@@ -3165,13 +3210,25 @@ async function acceptPhoto(source){
   if(S.settings.aiMode==='auto' && S.draft?.blob) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wpick],[data-batch],[data-bmem],[data-bdel],[data-bretry],[data-bsize],[data-hest],[data-newmember],[data-intro],[data-guide],[data-backuplater],[data-backupnow],[data-introclose],[data-intronext],[data-introstart],[data-diag],[data-diagdone],[data-bdup],[data-bdupact],[data-dupreview],[data-dupmerge],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-step],[data-wearon],[data-fontscale],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#batch-cam,#batch-pick,#batch-save,#batch-cancel,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wpick],[data-batch],[data-bmem],[data-bdel],[data-bretry],[data-bsize],[data-hest],[data-newmember],[data-intro],[data-guide],[data-backuplater],[data-backupnow],[data-aiconsent],[data-aiconsentreset],[data-introclose],[data-intronext],[data-introstart],[data-diag],[data-diagdone],[data-bdup],[data-bdupact],[data-dupreview],[data-dupmerge],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-step],[data-wearon],[data-fontscale],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#batch-cam,#batch-pick,#batch-save,#batch-cancel,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
   if(t.hasAttribute('data-intro')) return openIntro();
   if(t.hasAttribute('data-backupnow')) return exportData(true);
   if(t.hasAttribute('data-backuplater')){ S.settings.backupSnooze=Date.now()+7*86400000; saveSettings(); toast('1週間後にまたお知らせします'); return renderToday() }
+  if(g('data-aiconsent')){
+    const yes=g('data-aiconsent')==='yes', r=S._consentRes; S._consentRes=null;
+    if(yes) S.settings.aiConsent=Date.now();
+    else { S.settings.aiMode='off'; toast('AIを使わない設定にしました。設定でいつでも変えられます') }
+    saveSettings(); closeSheet(); r?.(yes);
+    if(!yes){ if(S.view==='today') renderToday(); else if(S.view==='add') renderAdd(); else if(S.view==='set') renderSet() }
+    return;
+  }
+  if(t.hasAttribute('data-aiconsentreset')){
+    S.settings.aiConsent=null; saveSettings();
+    toast('取り消しました。次にAIを使うときに、もう一度確認します'); return renderSet();
+  }
   if(t.hasAttribute('data-guide')){ if(!$('#intro').hidden) closeIntro(); return openIntro('guide') }
   if(t.hasAttribute('data-introclose')) return closeIntro();
   if(t.hasAttribute('data-intronext')){ const tr=$('#intro-track'); tr.scrollBy({left:tr.clientWidth,behavior:'smooth'}); return }
