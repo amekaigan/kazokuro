@@ -682,11 +682,24 @@ function saveUsage(){
    原価ゼロのもの（家族・服・写真の保存）と、原価がかかるもの（AI）を分けて上限を置く */
 const PLANS={
   // shot＝「着ている服を撮ってAIが探す」を毎月の回数で使えるか。無料ははじめての30日と回数パックだけ
-  free:    {name:'無料',     members:6,  items:150, photoKeep:{days:30},   ai:5,   shot:false},
-  onetime: {name:'買い切り', members:8,  items:300, photoKeep:{count:300}, ai:30,  shot:true},
-  monthly: {name:'月額',     members:10, items:600, photoKeep:{count:999}, ai:200, shot:true}
+  // price＝通常の値段（円）。月額は1か月ごと、買い切りは1回だけ
+  free:    {name:'無料',     members:6,  items:150, photoKeep:{days:30},   ai:5,   shot:false, price:0},
+  onetime: {name:'買い切り', members:8,  items:300, photoKeep:{count:300}, ai:30,  shot:true,  price:950},
+  monthly: {name:'月額',     members:10, items:600, photoKeep:{count:999}, ai:200, shot:true,  price:350}
 };
-const PACK_SIZE=100, PACK_DAYS=180;
+const PACK_SIZE=100, PACK_DAYS=180, PACK_PRICE=250;
+/* 公開記念キャンペーン。until に最終日（'2027-01-31' など）を入れると、その日まで値下げした値段を出す。null のあいだは出さない */
+const CAMPAIGN={until:null, name:'公開記念キャンペーン', monthly:250, onetime:750, pack:200};
+function campaignOn(){ return !!CAMPAIGN.until && today()<=CAMPAIGN.until }
+function priceLabel(k){
+  const reg={free:0,onetime:PLANS.onetime.price,monthly:PLANS.monthly.price,pack:PACK_PRICE}[k];
+  if(!reg) return '無料';
+  const unit=k==='monthly'?'/月':k==='onetime'?'（1回だけ）':'';
+  const yenS=n=>'¥'+n.toLocaleString('ja-JP');
+  return campaignOn()&&CAMPAIGN[k]!=null
+    ? `<s class="muted">${yenS(reg)}</s> <b style="color:var(--amber)">${yenS(CAMPAIGN[k])}</b>${unit}`
+    : `${yenS(reg)}${unit}`;
+}
 function planKey(){ const k=S.settings.plan; return k==='unlimited' ? 'monthly' : (PLANS[k] ? k : 'free') }
 function plan(){ return PLANS[planKey()] }
 function keepLabel(p){ return p.photoKeep.days ? `直近${p.photoKeep.days}日` : `直近${p.photoKeep.count}枚` }
@@ -726,8 +739,10 @@ function canAddMember(){ return S.members.length < plan().members }
 function planTable(){
   const ks=Object.keys(PLANS), cur=planKey();
   const row=(n,f)=>`<tr><th>${n}</th>${ks.map(k=>`<td class="${k===cur?'cur':''}">${f(PLANS[k])}</td>`).join('')}</tr>`;
-  return `<table class="ptab"><thead><tr><th></th>${ks.map(k=>`<th class="${k===cur?'cur':''}">${PLANS[k].name}</th>`).join('')}</tr></thead><tbody>
-    ${row('家族',x=>x.members+'人')}${row('服',x=>x.items+'着')}${row('着た日の写真',x=>keepLabel(x))}${row('AI判別',x=>'月'+x.ai+'回')}${row('撮って記録（AI）',x=>x.shot?'○':'最初の30日<br>＋回数パック')}${row('回数パック',()=>'購入可')}
+  const camp=campaignOn()?`<div class="note amber tiny" style="margin-top:12px">🎉 ${CAMPAIGN.name}：${fmtMD(CAMPAIGN.until).replace(/（.）/,'')}まで値下げしています。</div>`:'';
+  return `${camp}<table class="ptab"><thead><tr><th></th>${ks.map(k=>`<th class="${k===cur?'cur':''}">${PLANS[k].name}</th>`).join('')}</tr></thead><tbody>
+    <tr><th>値段</th>${ks.map(k=>`<td class="${k===cur?'cur':''}">${priceLabel(k)}</td>`).join('')}</tr>
+    ${row('家族',x=>x.members+'人')}${row('服',x=>x.items+'着')}${row('着た日の写真',x=>keepLabel(x))}${row('AI判別',x=>'月'+x.ai+'回')}${row('撮って記録（AI）',x=>x.shot?'○':'最初の30日<br>＋回数パック')}${row('回数パック',()=>`${PACK_SIZE}回 ${priceLabel('pack')}`)}
   </tbody></table>`;
 }
 /* 上限に当たったとき。止めるのは新しい追加だけで、今あるデータはそのまま見られる */
@@ -746,7 +761,7 @@ function openLimit(kind){
       ?'「服を選んで記録する」は、このまま無料で使えます。'
       :'登録済みの服や記録は、このまますべて見られます。止まるのは新しい追加だけです。'}</p>
     ${planTable()}
-    ${kind==='ai'||kind==='shot'?`<p class="tiny muted" style="margin:12px 0 0">回数パック（${PACK_SIZE}回・${PACK_DAYS}日有効）を足すと、今月の残りでも使えます。来月になれば毎月の回数は戻ります。</p>`:''}
+    ${kind==='ai'||kind==='shot'?`<p class="tiny muted" style="margin:12px 0 0">回数パック（${PACK_SIZE}回・${PACK_DAYS}日有効・${priceLabel('pack')}）を足すと、今月の残りでも使えます。来月になれば毎月の回数は戻ります。</p>`:''}
     <div class="act col">
       <button class="btn wide" data-go="set" data-close>プランを見る</button>
     </div><div class="sp"></div>`);
