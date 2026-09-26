@@ -390,8 +390,7 @@ a.btn{text-decoration:none}
 a:not(.btn){color:var(--indigo)}
 .legal{display:flex;flex-wrap:wrap;gap:0 18px;margin:6px 0 -8px;font-size:calc(14px*var(--fs,1))}
 .legal a{font-weight:600;display:inline-block;padding:11px 0}
-.consent{margin:0 0 12px;padding-left:1.2em;font-size:calc(14px*var(--fs,1));line-height:1.7}
-.consent li{margin-bottom:6px}
+.consent{margin:12px 0 0;line-height:1.7}
 .backupnote b{display:block;margin-bottom:2px}
 .aioffnote{display:block;width:100%;margin-top:8px;text-align:left;background:var(--surface);color:var(--ink2);border:1px dashed var(--line)}
 .steps{margin-bottom:14px;border:2px solid var(--indigo)}
@@ -539,7 +538,7 @@ const MEMBER_COLORS = [
   {n:'レッド',  hex:'#B84B42'}, {n:'グレー',  hex:'#6B7B82'}
 ];
 const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
-const APP_VERSION = '0.9.5';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
+const APP_VERSION = '0.9.6';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
 const KID_SIZES = ['60','70','80','90','100','110','120','130','140','150','160'];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL'];
 const FREE_SIZE = 'F';         // フリーサイズ。数字ではないのでサイズアウト判定の対象外
@@ -1751,15 +1750,11 @@ function aiConsent(){
   S._consentP=new Promise(res=>{
     S._consentRes=res;
     openSheet(`<div class="shead"><h3>写真をAIに送ってもいいですか？</h3><button class="x" data-close>閉じる</button></div>
-      <p style="margin:0 0 10px">服の種類や色を判別するために、撮った写真をAI（Anthropic社のClaude）に送ります。</p>
-      <ul class="consent">
-        <li>送るのは服の写真と、登録済みの服の種類・色・サイズだけ。家族の名前・誕生日・身長は送りません。</li>
-        <li>写真はこのアプリの側では保存しません。AIの学習にも使われません。</li>
-        <li>顔や名札など、服以外のものが写らないように撮ってください。</li>
-      </ul>
-      <p class="tiny muted" style="margin:0 0 4px">くわしくは<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>へ。同意は設定からいつでも取り消せます。</p>
-      <div class="act col"><button class="btn wide" data-aiconsent="yes">同意してAIを使う</button>
-        <button class="btn ghost wide" data-aiconsent="no">AIを使わない</button></div>`);
+      <p style="margin:0">服の種類や色を見分けるため、写真をAI（Anthropic社のClaude）に送ります。</p>
+      <div class="act col" style="margin-top:12px"><button class="btn wide" data-aiconsent="yes">同意してAIを使う</button>
+        <button class="btn ghost wide" data-aiconsent="no">AIを使わない</button></div>
+      <p class="tiny muted consent">送るのは服の写真と、登録済みの服の種類・色・サイズだけです。家族の名前・誕生日・身長は送りません。写真はこのアプリの側では保存せず、AIの学習にも使われません。顔や名札など、服以外が写らないように撮ってください。
+        くわしくは<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>へ。同意は設定からいつでも取り消せます。</p>`);
   }).then(ok=>{ S._consentP=null; S._consentRes=null; return ok });
   return S._consentP;
 }
@@ -1809,7 +1804,7 @@ async function outfitIdentify(file){
       .sort((a,b)=>(b.confidence||0)-(a.confidence||0));
     S._outfit={day, mid, photo:image, found,
       unmatched:(json.result?.unmatched||[]).slice(0,4),
-      pick:new Set(found.filter(w=>(w.confidence||0)>=0.7).map(w=>w.id))};
+      pick:prePick(found)};
     renderOutfit();
   }catch(err){
     if(S._outfitTok===tok){ closeSheet(); toast(err.busy?err.message:'判別できませんでした') }
@@ -1845,6 +1840,7 @@ function renderOutfit(){
       <div class="tiny muted" style="padding:6px 0">未登録かもしれない服</div>
       ${o.unmatched.map((u,i)=>`<div class="hist"><b style="min-width:0;flex:1">${esc(u)}</b>
         <button class="linkish" data-oreg="${i}" style="color:var(--indigo)">登録する</button></div>`).join('')}
+      ${o.pick.size?`<div class="tiny muted" style="padding:4px 0 6px">「登録する」を押すと、上で選んだ${o.pick.size}着も記録されます。</div>`:''}
     </div>`:'';
   openSheet(`
     <div class="shead"><h3>${o.mode==='manual'?'一覧から選ぶ':'この服を着ていますか？'}</h3><button class="x" data-close>閉じる</button></div>
@@ -1856,7 +1852,7 @@ function renderOutfit(){
     </div>
     <div class="act">
       <button class="btn sub" data-outfitmode="${o.mode==='manual'?'ai':'manual'}">${o.mode==='manual'?'AIの候補に戻る':'一覧から自分で選ぶ'}</button>
-      <button class="btn sub" data-oreg="">新しく登録する</button>
+      <button class="btn sub" data-oreg="">${o.pick.size?`選んだ${o.pick.size}着を記録して、新しく登録`:'新しく登録する'}</button>
     </div>
     <div class="act"><button class="btn ghost wide" data-close>やめる</button></div>
     <div class="sp"></div>`);
@@ -1876,6 +1872,17 @@ async function resizeTo(blob,max,q){
   return new Promise(r=>cv.toBlob(r,'image/jpeg',q));
 }
 /* 拡大用（長辺640px・約70KB）と小さい版（長辺240px・約10KB）を保存する */
+/* AIの候補のうち、最初から選んでおくのは種類ごとに1着だけ（マッチ70%以上でいちばん高いもの）。
+   人が同時に着るシャツは1枚なので、似た服が何着も選ばれた状態にしない */
+function prePick(found){
+  const best=new Map();
+  for(const w of found){
+    const it=S.items.find(i=>i.id===w.id); if(!it||(w.confidence||0)<0.7) continue;
+    const cur=best.get(it.category);
+    if(!cur||(w.confidence||0)>(cur.confidence||0)) best.set(it.category,w);
+  }
+  return new Set([...best.values()].map(w=>w.id));
+}
 async function saveOutfitPhoto(o){
   if(o.outfitId) return o.outfitId;
   const src=await (await fetch(o.photo)).blob();
