@@ -418,7 +418,8 @@ a:not(.btn){color:var(--indigo)}
 @keyframes camflash{to{opacity:0}}
 .stats.small div{padding:11px 6px}
 .stats.small b{font-size:calc(18px*var(--fs,1))}
-.outfit-photo{width:100%;max-height:44vh;object-fit:contain;border-radius:14px;background:#000;display:block;margin-bottom:10px}
+.outfit-photo{display:block;max-width:100%;max-height:22vh;width:auto;margin:0 auto 10px;border-radius:12px;cursor:zoom-in}
+.outfit-photo.big{max-height:60vh;cursor:zoom-out}
 .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 2px;flex-wrap:wrap}
 .sortsel{display:inline-flex;align-items:center;gap:8px;font-size:calc(13px*var(--fs,1));color:var(--ink2);font-weight:700;margin-left:auto}
 .sortsel select{width:auto;min-height:44px;padding:0 36px 0 14px;border-radius:999px;font-size:max(16px,calc(15px*var(--fs,1)));font-weight:600;
@@ -1844,7 +1845,7 @@ function renderOutfit(){
     </div>`:'';
   openSheet(`
     <div class="shead"><h3>${o.mode==='manual'?'一覧から選ぶ':'この服を着ていますか？'}</h3><button class="x" data-close>閉じる</button></div>
-    ${o.mode==='manual'?'':`<img class="outfit-photo" src="${o.photo}" alt="">`}
+    ${o.mode==='manual'?'':`<img class="outfit-photo" src="${o.photo}" alt="撮った写真（タップで拡大）" onclick="this.classList.toggle('big')">`}
     ${body}
     ${o.mode==='manual'?'':unmatched}
     <div class="act col">
