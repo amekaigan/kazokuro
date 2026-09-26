@@ -10,12 +10,12 @@
 <style>
 :root{
   --bg:#E8ECEE; --surface:#FFFFFF; --surface2:#F3F6F7;
-  --ink:#16323B; --ink2:#5C7480; --ink3:#8CA0A8;
+  --ink:#16323B; --ink2:#50666F; --ink3:#566A73;
   --line:#D5DDE0; --line2:#E6ECEE;
   --indigo:#24557A; --indigo-d:#1A4160; --indigo-bg:#E4EDF4;
-  --amber:#A96E12; --amber-bg:#FAF0DC;
+  --amber:#875709; --amber-bg:#FAF0DC;
   --ok:#35705A; --ok-bg:#E4F0EA;
-  --danger:#9B3B33;
+  --danger:#9B3B33; --orange:#A4540F;
   --r:14px; --r-s:9px;
   --safe-t:env(safe-area-inset-top,0px);
   --safe-b:env(safe-area-inset-bottom,0px);
@@ -25,12 +25,12 @@
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     --bg:#101A1E; --surface:#182529; --surface2:#1F2E33;
-    --ink:#E4EDEF; --ink2:#9AB0B8; --ink3:#6E858D;
+    --ink:#E4EDEF; --ink2:#9AB0B8; --ink3:#8AA2AB;
     --line:#2A3B41; --line2:#223237;
     --indigo:#7FB0D6; --indigo-d:#A3C8E5; --indigo-bg:#1C3243;
     --amber:#D9A74E; --amber-bg:#33291A;
     --ok:#6FB294; --ok-bg:#1B2F28;
-    --danger:#D97A70;
+    --danger:#D97A70; --orange:#E08A4A;
   }
 }
 *,*::before,*::after{box-sizing:inherit}
@@ -86,7 +86,7 @@ nav.tabs button .dot{position:absolute;margin-top:-30px;margin-left:18px;min-wid
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
   padding:14px 20px;min-height:52px;border-radius:12px;font-size:calc(16px*var(--fs,1));font-weight:700;
   background:var(--indigo);color:#fff;transition:opacity .12s}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn{color:#0E1A20}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn:not(.ghost):not(.sub){color:#0E1A20}}
 .btn:active{opacity:.75}
 .btn.ghost{background:transparent;color:var(--indigo);border:1px solid var(--line)}
 .btn.sub{background:var(--surface2);color:var(--ink);border:1px solid var(--line)}
@@ -110,8 +110,8 @@ textarea{resize:vertical;line-height:1.7}
 .chip{display:inline-flex;align-items:center;min-height:48px;
   padding:0 18px;border-radius:999px;border:1px solid var(--line);
   background:var(--surface2);font-size:calc(15px*var(--fs,1));font-weight:600;color:var(--ink2)}
-.chip[aria-pressed="true"]{background:var(--indigo);border-color:var(--indigo);color:#fff}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chip[aria-pressed="true"]{color:#0E1A20}}
+.chip[aria-pressed="true"],.chip[data-on="true"]{background:var(--indigo);border-color:var(--indigo);color:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chip[aria-pressed="true"],:root:not([data-theme="light"]) .chip[data-on="true"]{color:#0E1A20}}
 .chip .sw{display:inline-block;width:15px;height:15px;border-radius:4px;margin-right:8px;
   border:1px solid rgba(0,0,0,.18);flex:0 0 auto}
 
@@ -267,7 +267,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .fc-go{width:100%;text-align:left;border-top:1px solid var(--line2);min-height:50px}
 .fc-go .chev{font-style:normal;color:var(--ink3);font-size:calc(20px*var(--fs,1));margin-left:2px}
 .qtyctl{display:inline-flex;align-items:center;gap:10px}
-.qtyctl button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);
+.qtyctl button{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);
   background:var(--surface2);font-size:calc(18px*var(--fs,1));font-weight:700;color:var(--ink)}
 .dupbox{margin-top:14px;padding:12px;border-radius:14px;background:var(--amber-bg)}
 .dupq{font-size:calc(14px*var(--fs,1));font-weight:700;color:var(--amber);margin-bottom:10px}
@@ -284,7 +284,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .datechip,.datebtn{position:relative;overflow:hidden;cursor:pointer}
 .shead-act{display:flex;align-items:center;gap:2px}
 .navbar{display:flex;align-items:center;gap:10px;margin:10px 0 0;font-size:calc(13px*var(--fs,1));color:var(--ink2);flex-wrap:wrap}
-.navbar .navbtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);
+.navbar .navbtn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);
   font-size:calc(22px*var(--fs,1));line-height:1;color:var(--ink);display:flex;align-items:center;justify-content:center}
 .navbar .navbtn[disabled]{opacity:.3}
 .navbar em{font-style:normal;font-size:calc(12px*var(--fs,1));color:var(--ink3);flex-basis:100%}
@@ -307,7 +307,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 /* ホームの記録パネル。下の参考情報と見分けがつくよう色と太枠で囲う */
 .homecard.rec{background:var(--indigo-bg);border:2px solid var(--indigo)}
 .homecard.rec .homehead b{color:var(--indigo-d)}
-.homecard.rec .chip:not([aria-pressed="true"]){background:var(--surface)}
+.homecard.rec .chip:not([aria-pressed="true"]):not([data-on="true"]){background:var(--surface)}
 .homecard.rec .btn.sub{background:var(--surface);color:var(--ink)}
 .wornstrip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:2px 0 12px}
 .wornstrip .tile{border-radius:10px}
@@ -333,7 +333,7 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .brow .bst.busy,.brow .bst.wait{color:var(--indigo)}
 .brow .bst.err{color:var(--amber)}
 .brow .bst .sw{display:inline-block;width:12px;height:12px;border-radius:4px;border:1px solid var(--line)}
-.bdel{width:40px;height:40px;flex:0 0 40px;border-radius:10px;color:var(--ink3);font-size:calc(16px*var(--fs,1))}
+.bdel{width:44px;height:44px;flex:0 0 44px;border-radius:10px;color:var(--ink3);font-size:calc(16px*var(--fs,1))}
 .bdup{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:6px 8px;border-radius:10px;
   background:var(--amber-bg);color:var(--amber);font-size:calc(12.5px*var(--fs,1));font-weight:700}
 .bdup img,.bdup .ph{width:34px;height:34px;flex:0 0 34px;border-radius:7px;object-fit:cover;background:var(--surface2);
@@ -354,12 +354,12 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .intro-v{width:100%;max-width:340px}
 .iv-cloud{display:flex;justify-content:center;gap:6px;font-size:calc(40px*var(--fs,1))}
 .iv-cloud span:nth-child(odd){transform:translateY(8px)}
-.iv-chip{display:inline-block;margin-top:14px;padding:8px 14px;border-radius:999px;background:#FAF0DC;color:#A96E12;font-weight:700;font-size:calc(14px*var(--fs,1))}
+.iv-chip{display:inline-block;margin-top:14px;padding:8px 14px;border-radius:999px;background:#FAF0DC;color:#875709;font-weight:700;font-size:calc(14px*var(--fs,1))}
 .iv-card{background:rgba(255,255,255,.96);color:#16323B;border-radius:18px;padding:12px 14px;text-align:left;box-shadow:0 12px 30px rgba(0,0,0,.25)}
 .iv-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid #E6ECEE;font-size:calc(14px*var(--fs,1))}
 .iv-row:first-child{border-top:none}
 .iv-row em{font-style:normal;font-weight:700;color:#24557A}
-.iv-row em.r{color:#9B3B33}.iv-row em.a{color:#A96E12}.iv-row em.o{color:#35705A}
+.iv-row em.r{color:#9B3B33}.iv-row em.a{color:#875709}.iv-row em.o{color:#35705A}
 .iv-cam{margin:4px 0;padding:10px;border-radius:10px;background:#0B1418;color:#fff;font-weight:700;font-size:calc(13px*var(--fs,1));text-align:center}
 .iv-note{padding:9px 10px;border-radius:10px;background:#F1F5F7;margin-top:8px;font-size:calc(13.5px*var(--fs,1));font-weight:600}
 .iv-note:first-child{margin-top:0}
@@ -388,16 +388,16 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .backupnote,.resumenote{display:block;width:100%;text-align:left;margin-bottom:12px}
 a.btn{text-decoration:none}
 a:not(.btn){color:var(--indigo)}
-.legal{display:flex;flex-wrap:wrap;gap:6px 18px;margin:14px 0 0;font-size:calc(14px*var(--fs,1))}
-.legal a{font-weight:600;padding:6px 0}
+.legal{display:flex;flex-wrap:wrap;gap:0 18px;margin:6px 0 -8px;font-size:calc(14px*var(--fs,1))}
+.legal a{font-weight:600;display:inline-block;padding:11px 0}
 .consent{margin:0 0 12px;padding-left:1.2em;font-size:calc(14px*var(--fs,1));line-height:1.7}
 .consent li{margin-bottom:6px}
 .backupnote b{display:block;margin-bottom:2px}
 .aioffnote{display:block;width:100%;margin-top:8px;text-align:left;background:var(--surface);color:var(--ink2);border:1px dashed var(--line)}
 .steps{margin-bottom:14px;border:2px solid var(--indigo)}
-.step{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line2);opacity:.55}
+.step{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line2)}
 .step:first-of-type{border-top:none}
-.step.now,.step.done{opacity:1}
+.step:not(.now):not(.done) b{color:var(--ink2);font-weight:600}
 .step>i{flex:0 0 30px;height:30px;border-radius:15px;background:var(--surface2);border:1px solid var(--line);
   display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:700;font-size:calc(14px*var(--fs,1))}
 .step.now>i{background:var(--indigo);border-color:var(--indigo);color:#fff}
@@ -413,7 +413,7 @@ a:not(.btn){color:var(--indigo)}
 .diagcard .diagrow.out span{color:var(--danger)}
 .diagcard .diagrow.soon span{color:var(--amber)}
 .diagcard .diagrow.ok span{color:var(--ok)}
-.diagcard .diagrow.year span{color:#C0651A}
+.diagcard .diagrow.year span{color:var(--orange)}
 .cam-count{margin:0;color:#fff;font-weight:700;font-size:calc(15px*var(--fs,1));text-align:center;line-height:1.6;padding:0 16px}
 .cam-stage.flash::after{content:'';position:absolute;inset:0;background:#fff;opacity:.6;animation:camflash .25s forwards}
 @keyframes camflash{to{opacity:0}}
@@ -428,7 +428,7 @@ a:not(.btn){color:var(--indigo)}
   margin:0;padding:0;border:0;opacity:0;-webkit-appearance:none;appearance:none}
 .tile.worn{outline:3px solid var(--ok);outline-offset:-3px}
 .agebar{margin:12px 2px 0;font-size:calc(15px*var(--fs,1));font-weight:700;color:var(--ink)}
-.linkish{color:var(--indigo);text-decoration:underline;font-weight:700;padding:0;min-height:0}
+.linkish{color:var(--indigo);text-decoration:underline;font-weight:700;padding:11px 0;margin:-11px 0;min-height:0;display:inline-block}
 .airow .btn{flex:0 0 auto}
 .row .th.av{color:#fff;font-size:calc(20px*var(--fs,1));font-weight:700;border:none;line-height:1}
 .chip .mdot{display:inline-block;width:11px;height:11px;border-radius:6px;margin-right:8px;flex:0 0 auto}
@@ -539,7 +539,7 @@ const MEMBER_COLORS = [
   {n:'レッド',  hex:'#B84B42'}, {n:'グレー',  hex:'#6B7B82'}
 ];
 const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
-const APP_VERSION = '0.9.4';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
+const APP_VERSION = '0.9.5';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
 const KID_SIZES = ['60','70','80','90','100','110','120','130','140','150','160'];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL'];
 const FREE_SIZE = 'F';         // フリーサイズ。数字ではないのでサイズアウト判定の対象外
@@ -1529,7 +1529,7 @@ function renderToday(){
     <div class="datebar">
       ${[[0,'今日'],[1,'昨日'],[2,'おととい']].map(([n,lab])=>
         `<button class="chip" data-wday="${ago(n)}" aria-pressed="${day===ago(n)}">${lab}</button>`).join('')}
-      <label class="chip datechip" aria-pressed="${custom}"><span id="wd-label">📅 ${custom?esc(fmtMD(day).replace(/（.）/,'')):'他の日'}</span>
+      <label class="chip datechip" data-on="${custom}"><span id="wd-label">📅 ${custom?esc(fmtMD(day).replace(/（.）/,'')):'他の日'}</span>
         <input type="date" id="wear-date" value="${day}" max="${today()}" aria-label="日付を選ぶ"></label>
     </div>
     ${isToday?'':`<button class="note amber" data-wday="${today()}" style="display:block;width:100%;text-align:left;margin-bottom:10px">${esc(fmtMD(day))}の記録を編集中です。タップで今日に戻ります</button>`}
@@ -1733,6 +1733,9 @@ function stepsCard(){
       `<button class="btn sm" data-diag="${target}">診断結果を見る</button>`)}
   </div>`;
 }
+
+/* 動きを減らす設定の人には、スクロールも一瞬で動かす */
+const SMOOTH=()=>matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth';
 
 /* 受け口が「使いすぎ」（429）で断ったときは、その理由をそのまま見せる */
 function aiFail(res,json){
@@ -2288,11 +2291,11 @@ function renderSet(){
     <div class="note ${S._persisted?'ok':'amber'} tiny" style="margin-bottom:12px">${S._persisted
       ? 'データ保護：有効。ブラウザが容量整理でこのアプリのデータを消すことはありません。'
       : 'データ保護：未確認。ホーム画面に追加して使うと、ブラウザにデータを消されにくくなります。'}</div>
-    <p class="tiny muted" style="margin:0 0 12px">データはこの端末のブラウザ内だけに保存されています。ブラウザのデータを消すと失われます。定期的に書き出してください。</p>
+    <p class="tiny muted" style="margin:0 0 12px">データはこの端末のブラウザ内だけに保存されています。ブラウザのデータを消すと失われます。定期的に書き出してください。<br>書き出したファイルには、家族の名前・誕生日・写真が入っています。人に送ったり、共有のフォルダに置いたりしないでください。</p>
     <p class="tiny" style="margin:0 0 12px">最後に写真ごと書き出した日：<b>${S.settings.lastBackup?fmtMD(ymd(new Date(S.settings.lastBackup))):'まだありません'}</b></p>
     <div class="act">
-      <button class="btn sub" id="exp-meta">データのみ書き出す</button>
-      <button class="btn sub" id="exp-full">写真ごと書き出す</button>
+      <button class="btn sub" id="exp-meta"><span style="text-align:center">${phr('データのみ|書き出す')}</span></button>
+      <button class="btn sub" id="exp-full"><span style="text-align:center">${phr('写真ごと|書き出す')}</span></button>
     </div>
     <div class="act"><button class="btn ghost wide" id="imp">読み込む</button></div>
     <input type="file" id="impfile" accept="application/json,.json" hidden>
@@ -2961,7 +2964,7 @@ async function saveBatch(){
   const miss=b.list.filter(i=>!i.category);
   if(miss.length){
     toast(`カテゴリが決まっていない服が${miss.length}着あります`);
-    $('#br-'+miss[0].k)?.scrollIntoView({block:'center',behavior:'smooth'});
+    $('#br-'+miss[0].k)?.scrollIntoView({block:'center',behavior:SMOOTH()});
     return;
   }
   const room=plan().items-countItems();
@@ -3248,7 +3251,7 @@ document.addEventListener('click',async e=>{
   }
   if(t.hasAttribute('data-guide')){ if(!$('#intro').hidden) closeIntro(); return openIntro('guide') }
   if(t.hasAttribute('data-introclose')) return closeIntro();
-  if(t.hasAttribute('data-intronext')){ const tr=$('#intro-track'); tr.scrollBy({left:tr.clientWidth,behavior:'smooth'}); return }
+  if(t.hasAttribute('data-intronext')){ const tr=$('#intro-track'); tr.scrollBy({left:tr.clientWidth,behavior:SMOOTH()}); return }
   if(t.hasAttribute('data-introstart')){ closeIntro(); go('today'); return S.members.length?null:openMemberForm(null) }
   if(t.hasAttribute('data-diagdone')) S.diag=null;
   if(g('data-diag')){ S.diag={mid:g('data-diag'),n:0}; return go('add') }
