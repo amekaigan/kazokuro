@@ -539,7 +539,7 @@ const MEMBER_COLORS = [
   {n:'レッド',  hex:'#B84B42'}, {n:'グレー',  hex:'#6B7B82'}
 ];
 const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
-const APP_VERSION = '0.9.3';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
+const APP_VERSION = '0.9.4';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
 const KID_SIZES = ['60','70','80','90','100','110','120','130','140','150','160'];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL'];
 const FREE_SIZE = 'F';         // フリーサイズ。数字ではないのでサイズアウト判定の対象外
@@ -1734,6 +1734,11 @@ function stepsCard(){
   </div>`;
 }
 
+/* 受け口が「使いすぎ」（429）で断ったときは、その理由をそのまま見せる */
+function aiFail(res,json){
+  const e=new Error(json?.error||('HTTP '+res.status)); e.busy=res.status===429; return e;
+}
+
 /* ---------- 写真をAIに送る前の同意 ----------
    はじめてAIを使うときに一度だけ聞く（ストアの審査でも、外部のAIに送る前の同意が求められる）。
    同じ画面で何度呼ばれても、確認の画面は1つだけ出す */
@@ -1792,7 +1797,7 @@ async function outfitIdentify(file){
       body:JSON.stringify({image,candidates})
     });
     const json=await res.json().catch(()=>null);
-    if(!res.ok||!json?.ok) throw new Error(json?.error||('HTTP '+res.status));
+    if(!res.ok||!json?.ok) throw aiFail(res,json);
     consumeAi('shot');
     if(S._outfitTok!==tok) return;               // 待っている間に閉じられた
     const ids=new Set(cands.map(i=>i.id));
@@ -1804,7 +1809,7 @@ async function outfitIdentify(file){
       pick:new Set(found.filter(w=>(w.confidence||0)>=0.7).map(w=>w.id))};
     renderOutfit();
   }catch(err){
-    if(S._outfitTok===tok){ closeSheet(); toast('判別できませんでした') }
+    if(S._outfitTok===tok){ closeSheet(); toast(err.busy?err.message:'判別できませんでした') }
   }
 }
 function renderOutfit(){
@@ -2726,7 +2731,7 @@ async function aiAnalyze(){
       body:JSON.stringify({image})
     });
     const json=await res.json().catch(()=>null);
-    if(!res.ok||!json?.ok) throw new Error(json?.error||('HTTP '+res.status));
+    if(!res.ok||!json?.ok) throw aiFail(res,json);
 
     // 成功したときだけ回数を消費する
     consumeAi();
@@ -2913,7 +2918,7 @@ function pumpBatchAi(){
   }
   while(b.running<BATCH_PARALLEL){
     const it=b.list.find(i=>i.st==='wait'); if(!it) break;
-    if(aiRemaining()-b.running<=0){        // 回数は成功したときに減るので、送信中の分を差し引いて見る
+    if(b.busy || aiRemaining()-b.running<=0){   // 回数は成功したときに減るので、送信中の分を差し引いて見る
       b.list.forEach(i=>{ if(i.st==='wait') i.st='skip' });
       if(S.view==='add') renderBatch();
       break;
@@ -2930,7 +2935,7 @@ async function batchAnalyze(it){
     const res=await fetch(API_BASE+'/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({image}),signal:ctl.signal}).finally(()=>clearTimeout(tm));
     const json=await res.json().catch(()=>null);
-    if(!res.ok||!json?.ok) throw new Error(json?.error||('HTTP '+res.status));
+    if(!res.ok||!json?.ok) throw aiFail(res,json);
     consumeAi();
     const r=json.result||{};
     if(!it.touchedCat && r.category && CATS.some(c=>c.id===r.category)) it.category=r.category;
@@ -2939,7 +2944,15 @@ async function batchAnalyze(it){
     if(Array.isArray(r.season)) it.season=r.season.filter(s=>SEASONS.includes(s));
     it.pattern=r.pattern||null; it.hasCharacterPrint=!!r.hasCharacterPrint;
     it.st='ok';
-  }catch(e){ it.st='err' }
+  }catch(e){
+    it.st='err';
+    if(e.busy && S.batch){          // 使いすぎで断られたら、残りとこのあと撮る分は送らずに手で選んでもらう
+      S.batch.busy=true;
+      S.batch.list.forEach(i=>{ if(i.st==='wait'){ i.st='skip'; saveBatchItem(i) } });
+      toast(e.message);
+      if(S.view==='add') renderBatch();
+    }
+  }
   saveBatchItem(it);
 }
 async function saveBatch(){
@@ -3314,7 +3327,7 @@ document.addEventListener('click',async e=>{
     if(b.list[i].st==='busy') return toast('AIの判別が終わってから外せます');
     URL.revokeObjectURL(b.list[i].url); dropBatchItem(b.list[i].k); b.list.splice(i,1); return renderBatch();
   }
-  if(g('data-bretry')){ const it=S.batch?.list.find(x=>x.k===g('data-bretry')); if(it){ it.st='wait'; pumpBatchAi() } return }
+  if(g('data-bretry')){ const it=S.batch?.list.find(x=>x.k===g('data-bretry')); if(it){ it.st='wait'; S.batch.busy=false; pumpBatchAi() } return }
   if(g('data-bdup')) return openBatchDup(g('data-bdup'));
   if(g('data-bdupact')){ const [k,act,...rest]=g('data-bdupact').split('|'); return batchDupAct(k,act,rest.join('|')) }
   if(t.hasAttribute('data-dupreview')) return openDupReview();
