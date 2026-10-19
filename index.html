@@ -228,6 +228,13 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
   background:var(--surface);border:1px solid var(--line);
   box-shadow:0 8px 24px rgba(8,20,26,.14)}
 .stickybar .btn{flex:1;min-width:0;padding-left:8px;padding-right:8px;font-size:calc(15px*var(--fs,1))}
+/* 譲るリスト */
+.row .ck{width:28px;height:28px;flex:0 0 28px;border-radius:8px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;
+  font-size:calc(16px*var(--fs,1));font-weight:700;color:transparent;background:var(--surface)}
+.row[aria-pressed="true"] .ck{background:var(--indigo);border-color:var(--indigo);color:var(--surface)}
+.secline{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.secline .linkish{font-size:calc(13.5px*var(--fs,1))}
+.give-prev{width:100%;border-radius:var(--r-s);border:1px solid var(--line);display:block;margin-top:10px;background:var(--surface2)}
 .fc-head{display:flex;flex-direction:column;gap:2px;padding-bottom:10px;border-bottom:1px solid var(--line2);margin-bottom:6px}
 .fc-head b{font-size:calc(15px*var(--fs,1));font-weight:700}
 .fc-head span{font-size:calc(11.5px*var(--fs,1));color:var(--ink2);font-variant-numeric:tabular-nums}
@@ -298,6 +305,24 @@ h2.sec .c{font-weight:500;color:var(--ink3);font-size:calc(13px*var(--fs,1));mar
 .ptab tbody th{text-align:left;color:var(--ink2);font-weight:600}
 .ptab .cur{background:var(--indigo-bg);color:var(--indigo-d);font-weight:700}
 .homecard{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px 14px 14px;margin-top:2px}
+.fam{display:grid;gap:10px;margin-bottom:14px}
+.famcard{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px}
+.famcard .fh{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.famcard .fh b{font-size:calc(17px*var(--fs,1));font-weight:700;display:flex;align-items:center;gap:7px}
+.famcard .fh span{font-size:calc(12.5px*var(--fs,1));color:var(--ink2)}
+.famcard .now{margin-top:6px;font-size:calc(14px*var(--fs,1));color:var(--ink)}
+.famcard .now em{font-style:normal;font-weight:700;font-size:calc(18px*var(--fs,1))}
+.famcard .cats{margin-top:6px;font-size:calc(12.5px*var(--fs,1));color:var(--ink2);line-height:1.7}
+.famstat{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.famstat button{background:var(--surface2);border:1px solid var(--line2);border-radius:12px;padding:9px 4px;min-height:64px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--ink)}
+.famstat b{font-size:calc(20px*var(--fs,1));font-weight:700;font-variant-numeric:tabular-nums}
+.famstat span{font-size:calc(11.5px*var(--fs,1));color:var(--ink2);text-align:center;line-height:1.3}
+.famstat .r b{color:var(--danger)} .famstat .a b{color:var(--amber)} .famstat .g b{color:var(--ok)}
+.famadults{display:flex;flex-wrap:wrap;gap:8px}
+.szhead{grid-column:1/-1;display:flex;align-items:baseline;gap:8px;margin:14px 2px 2px;font-weight:700;font-size:calc(15px*var(--fs,1))}
+.szhead:first-child{margin-top:0}
+.szhead span{font-weight:500;color:var(--ink3);font-size:calc(12.5px*var(--fs,1))}
 .homehead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
 .homehead b{font-size:calc(20px*var(--fs,1));font-weight:700}
 .homehead span{font-size:calc(12.5px*var(--fs,1));color:var(--ink2)}
@@ -539,7 +564,7 @@ const MEMBER_COLORS = [
   {n:'レッド',  hex:'#B84B42'}, {n:'グレー',  hex:'#6B7B82'}
 ];
 const memberHex = m => (MEMBER_COLORS.find(c=>c.n===m?.color)||MEMBER_COLORS[7]).hex;
-const APP_VERSION = '0.9.6';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
+const APP_VERSION = '0.9.8';   // MAJOR.MINOR.PATCH。1.0.0 をストア公開とする
 const KID_SIZES = ['60','70','80','90','100','110','120','130','140','150','160'];
 const ADULT_SIZES = ['XS','S','M','L','XL','XXL'];
 const FREE_SIZE = 'F';         // フリーサイズ。数字ではないのでサイズアウト判定の対象外
@@ -743,7 +768,7 @@ function canShootAi(){
   if(welcome()) return aiRemaining()>0;
   return plan().shot ? aiRemaining()>0 : packLeft()>0;
 }
-function countItems(){ return S.items.filter(i=>(i.status||'active')!=='sold').length }
+function countItems(){ return S.items.filter(i=>!['sold','given'].includes(i.status||'active')).length }
 function canAddItem(){ return countItems() < plan().items }
 function canAddMember(){ return S.members.length < plan().members }
 function planTable(){
@@ -901,7 +926,8 @@ function sizeNum(s){ const n=parseInt(s,10); return Number.isFinite(n)&&n>=60&&n
 
 /* 眠り具合 → CSSフィルタ。着ていない服ほど色が抜ける */
 function fadeStyle(item){
-  const d=daysSince(item.lastWorn||item.addedAt);
+  if(!item.lastWorn) return '';   // 着た記録がない服は薄くしない（記録をつけない人には全部が薄く見えてしまう）
+  const d=daysSince(item.lastWorn);
   if(d===null||d<14) return '';
   const t=Math.min(1,(d-14)/(STALE_DAYS-14));
   const sat=(1-t*0.88).toFixed(2), op=(1-t*0.38).toFixed(2);
@@ -1170,6 +1196,7 @@ function isOutgrown(it){
 function isStale(it){
   if(!isActive(it)) return false;
   if(isOutgrown(it)) return false;
+  if(S.wears.length<10) return false;   // 着た記録をつけていない家族には「着ていない」を出さない
   const d=daysSince(it.lastWorn||it.addedAt);
   return d!==null && d>=STALE_DAYS;
 }
@@ -1474,7 +1501,7 @@ const TABS=[
   {id:'set',   n:'設定',       d:'M12 9a3 3 0 100 6 3 3 0 000-6zM4 12h2M18 12h2M12 4v2M12 18v2'}
 ];
 function renderTabs(){
-  const outN=S.items.filter(i=>isOutgrown(i)||isStale(i)).length;
+  const outN=S.items.filter(isOutgrown).length;   // 子どものサイズアウトだけ数える（長く着ていない服は急かさない）
   $('#tabs').innerHTML=TABS.map(t=>`
     <button data-tab="${t.id}" ${S.view===t.id?'aria-current="page"':''}>
       <svg viewBox="0 0 24 24"><path d="${t.d}"/></svg>
@@ -1516,7 +1543,7 @@ function renderToday(){
   const ago=n=>ymd(new Date(Date.now()-n*86400000));
   const custom=![0,1,2].some(n=>ago(n)===day);
 
-  let h=stepsCard()+batchResumeCard()+backupCard();
+  let h=stepsCard()+batchResumeCard()+familyCards()+backupCard();
 
   // ① 毎日使う：着た服を記録。服の一覧はシートで開き、ホームで誤って押さないようにする
   const wornMine=S.wears.filter(w=>w.date===day).map(w=>S.items.find(i=>i.id===w.itemId))
@@ -1572,6 +1599,38 @@ function renderToday(){
   markWornTiles();
 }
 
+/* ホームのいちばん上：家族ごとの「いま」。どの子が、何サイズで、何を何着持っているか */
+function familyCards(){
+  const kids=S.members.filter(isKidMember), adults=S.members.filter(m=>!isKidMember(m));
+  const own=m=>S.items.filter(i=>isActive(i)&&i.memberId===m.id);
+  const cnt=list=>list.reduce((t,i)=>t+(i.qty||1),0);
+  let h=`<h2 class="sec" style="margin-top:4px">家族の服</h2><div class="fam">`;
+  for(const m of kids){
+    const list=own(m), g=growthInfo(m), r=diagnose(m), f=g?fitSize(g.nowH):null;
+    const by={}; list.forEach(i=>{ by[i.category]=(by[i.category]||0)+(i.qty||1) });
+    const cats=CATS.filter(c=>by[c.id]).map(c=>`${c.n}${by[c.id]}`).join('・');
+    const handN=r.hand.length;
+    const hasYounger=kids.some(k=>k.id!==m.id&&k.birthday&&m.birthday&&k.birthday>m.birthday);
+    h+=`<div class="famcard">
+      <div class="fh"><b><span class="mdot" style="background:${memberHex(m)}"></span>${esc(m.name)}</b><span>${ageOf(m)??'?'}歳${g?`・約${g.nowH.toFixed(0)}cm`:''}</span></div>
+      <div class="now">${f?`今のサイズ <em>${f}</em>　`:''}持っている服 <em class="num">${cnt(list)}</em>着</div>
+      ${cats?`<div class="cats">${esc(cats)}</div>`:''}
+      ${g?`<div class="famstat">
+        <button class="r" data-diagsheet="${m.id}"><b>${r.out.length}</b><span>もう小さい</span></button>
+        <button class="a" data-diagsheet="${m.id}"><b>${r.soon.length}</b><span>3か月以内に<br>小さくなる</span></button>
+        ${hasYounger?`<button class="g" data-diagsheet="${m.id}"><b>${handN}</b><span>下の子が<br>着られる</span></button>`
+          :`<button class="a" data-diagsheet="${m.id}"><b>${r.year.length}</b><span>1年以内に<br>小さくなる</span></button>`}
+      </div>`:`<button class="note amber" data-member="${m.id}" style="display:block;width:100%;text-align:left;margin-top:10px">身長を入れると、もう小さい服・もうすぐ小さくなる服が分かります。タップして入力</button>`}
+      <div class="act" style="margin-top:10px"><button class="btn sub sm" data-famcloset="${m.id}">サイズ順で見る</button>${g?`<button class="btn ghost sm" data-diagsheet="${m.id}">診断を見る</button>`:''}</div>
+    </div>`;
+  }
+  if(adults.length){
+    h+=`<div class="famcard"><div class="famadults">${adults.map(m=>
+      `<button class="chip" data-famcloset="${m.id}"><span class="mdot" style="background:${memberHex(m)}"></span>${esc(m.name)}　${cnt(own(m))}着</button>`).join('')}</div></div>`;
+  }
+  return h+`</div>`;
+}
+
 /* 服を選んで記録するシート。件数が多くてもシートの中だけでスクロールする */
 function openWearPicker(){
   const m=memberOf(S._todayMem); if(!m) return;
@@ -1614,9 +1673,9 @@ const INTRO=[
       <div class="iv-row"><b>🟠 1年以内</b><em class="a">8着</em></div>
       <div class="iv-row"><b>🟢 まだ着られる</b><em class="o">26着</em></div></div>`,
    d:'登録が終わると|すぐに診断。<br>「ああ、確かに|もう小さいかも」が|分かります。'},
-  {g:'🎁', t:'おさがり・手放す', s:'下の子へ、|フリマへ。<br>迷わず回せる',
+  {g:'🎁', t:'おさがり・手放す', s:'下の子へ、|親戚や友だちへ。<br>迷わず回せる',
    v:`<div class="iv-card"><div class="iv-note ok">👕 あさひくんが今ちょうど着られます</div>
-      <div class="iv-note">📝 出品の文章と値段の目安をすぐ作成</div>
+      <div class="iv-note">📮 譲る服を、写真と一覧でまとめて送れます</div>
       <div class="iv-note">🔁 同じ服の二重登録にも気づきます</div></div>`,
    d:'サイズアウトした服の|行き先まで、<br>アプリが|一緒に考えます。'},
   {g:'🔒', t:'さっそく始めましょう', s:'会員登録なし。<br>写真は|スマホの中に',
@@ -1730,7 +1789,7 @@ function stepsCard(){
        ${noH.length?`<p class="tiny" style="color:var(--amber);margin:8px 0 0">${noH.map(m=>esc(m.name)).join('・')}さんの身長がまだです。
          <button class="linkish" data-member="${noH[0].id}" style="color:var(--amber)">入れる</button></p>`:''}`)}
     ${step(3,'診断結果を見る','「もう小さい服」「もうすぐ小さくなる服」「下の子が着られる服」が分かります。',
-      `<button class="btn sm" data-diag="${target}">診断結果を見る</button>`)}
+      `<button class="btn sm" data-diagsheet="${target}">診断結果を見る</button>`)}
   </div>`;
 }
 
@@ -2002,16 +2061,26 @@ function renderCloset(){
   $('#closet-body').innerHTML=`${dupN?`<button class="note amber dupnote" data-dupreview>同じ服かもしれない組が${dupN}組あります。確認する ›</button>`:''}
     <div class="grid" id="closet-grid"></div>
     <div class="legend">
-      <span>左下＝最後に着た日</span>
-      <span>色が薄い＝しばらく着ていない</span>
+      <span>左下＝サイズ</span>
+      ${S.wears.length?'<span>色が薄い＝しばらく着ていない</span>':''}
       <span><i style="background:var(--amber)"></i>サイズアウト</span>
     </div>`;
   S._closetList=list.map(i=>i.id);   // 詳細画面で左右に送るときの順番
-  chunkGrid($('#closet-grid'), list, it=>{
+  // サイズ順のときは、サイズごとに見出しを入れる（「130が3着、140が4着」が一目で分かるように）
+  let rows=list;
+  if((S.settings.closetSort||'new')==='size'){
+    rows=[]; let cur=null;
+    const cnt={}; list.forEach(i=>{ const k=i.size?sizeLabel(i.size):'サイズなし'; cnt[k]=(cnt[k]||0)+(i.qty||1) });
+    list.forEach(i=>{ const k=i.size?sizeLabel(i.size):'サイズなし';
+      if(k!==cur){ cur=k; rows.push({hdr:k, n:cnt[k]}) } rows.push(i) });
+  }
+  chunkGrid($('#closet-grid'), rows, it=>{
+    if(it.hdr) return `<div class="szhead">${esc(it.hdr)}${/^\d+$/.test(it.hdr)?'cm':''}<span>${it.n}着</span></div>`;
     const flag=isOutgrown(it)?'<span class="flag amber"></span>':'';
+    const lab=it.size?sizeLabel(it.size):(it.lastWorn?agoLabel(it.lastWorn):'');
     return `<button class="tile" data-item="${it.id}">
       <div class="ph" data-photo="${it.photoId||''}" style="${fadeStyle(it)}">${catOf(it.category).g}</div>
-      ${flag}${ownerBadge(it)}${qtyBadge(it)}${it.lastWorn?`<span class="tag">${agoLabel(it.lastWorn)}</span>`:''}
+      ${flag}${ownerBadge(it)}${qtyBadge(it)}${lab?`<span class="tag">${esc(lab)}</span>`:''}
     </button>`;
   });
 }
@@ -2178,30 +2247,119 @@ function renderOut(){
   const outg=S.items.filter(isOutgrown);
   const stale=S.items.filter(isStale);
   const listed=S.items.filter(i=>i.status==='listed');
-  $('#out-count').textContent=(outg.length+stale.length)+'着';
+  const giving=S.items.filter(i=>i.status==='giving');
+  $('#out-count').textContent=(outg.length+stale.length+giving.length)+'着';
 
-  if(!outg.length&&!stale.length&&!listed.length){
+  if(!outg.length&&!stale.length&&!listed.length&&!giving.length){
     $('#out-body').innerHTML=`<div class="empty"><span class="g">✨</span>
       <p>手放す候補はまだありません。<br>着用記録が貯まると、眠っている服がここに出ます。</p></div>`;
     return;
   }
+  const sel=S._giveSel, mode=!!sel;
+  const pick=it=>mode?pickRowHTML(it):rowHTML(it);
+  const selAll=(k,arr)=>mode&&arr.length?`<button class="linkish" data-gall="${k}">${arr.every(i=>sel.has(i.id))?'選択を外す':'すべて選ぶ'}</button>`:'';
   let h='';
-  h+=`<div class="note indigo">メルカリへの自動出品はできないため、ここで出品文と価格の目安を作ってコピーし、メルカリアプリに貼り付けてください。</div>`;
-
+  if(giving.length&&!mode){
+    h+=`<h2 class="sec">譲るリスト<span class="c">${giving.length}着</span></h2>
+      <div class="note ok">親戚や友だちに、写真と一覧をまとめて送れます。相手は欲しい服を番号で選べます。</div>
+      <div class="card" id="g-give" style="margin-top:10px">`+giving.map(rowHTML).join('')+`</div>
+      <div class="act"><button class="btn wide" id="give-send">写真と一覧をまとめて送る</button></div><div class="act" style="margin-top:8px"><button class="btn sub wide" id="give-done-all">全部「譲った」にする</button></div>`;
+  }
+  if(!mode&&(outg.length||stale.length)){
+    h+=`<div class="act"><button class="btn ghost wide" data-gmode="on">選んで譲るリストに入れる</button></div>`;
+  }
+  if(mode){
+    h+=`<div class="note indigo" style="margin-top:14px">譲る服をタップして選んでください。</div>`;
+  }
   if(outg.length){
-    h+=`<h2 class="sec">サイズアウト<span class="c">${outg.length}着</span></h2><div class="card" id="g-out">`+
-      outg.map(rowHTML).join('')+`</div>`;
+    h+=`<div class="secline"><h2 class="sec">サイズアウト<span class="c">${outg.length}着</span></h2>${selAll('out',outg)}</div><div class="card" id="g-out">`+
+      outg.map(pick).join('')+`</div>`;
   }
   if(stale.length){
-    h+=`<h2 class="sec">${STALE_DAYS}日以上着ていない<span class="c">${stale.length}着</span></h2><div class="card" id="g-stale">`+
-      stale.map(rowHTML).join('')+`</div>`;
+    h+=`<div class="secline"><h2 class="sec">${STALE_DAYS}日以上着ていない<span class="c">${stale.length}着</span></h2>${selAll('stale',stale)}</div><div class="card" id="g-stale">`+
+      stale.map(pick).join('')+`</div>`;
   }
-  if(listed.length){
+  if(mode){
+    h+=`<div class="stickybar"><button class="btn sub" data-gmode="off">やめる</button><button class="btn" id="give-add" ${sel.size?'':'disabled'}>${sel.size}着を譲るリストへ</button></div>`;
+  }
+  if(listed.length&&!mode){
     h+=`<h2 class="sec">出品中<span class="c">${listed.length}着</span></h2><div class="card" id="g-listed">`+
       listed.map(rowHTML).join('')+`</div>`;
   }
+  if(!mode) h+=`<div class="note indigo" style="margin-top:18px">売る場合は、服の詳細の「出品文をつくる」で出品文と価格の目安を作り、コピーしてメルカリアプリに貼り付けてください（自動で出品はできません）。</div>`;
   $('#out-body').innerHTML=h;
-  ['#g-out','#g-stale','#g-listed'].forEach(s=>hydratePhotos($(s)));
+  ['#g-give','#g-out','#g-stale','#g-listed'].forEach(s=>{ if($(s)) hydratePhotos($(s)) });
+}
+function pickRowHTML(it){
+  const m=memberOf(it.memberId), c=catOf(it.category), on=S._giveSel.has(it.id);
+  return `<button class="row" data-gsel="${it.id}" aria-pressed="${on}" style="width:100%;text-align:left">
+    <span class="ck" aria-hidden="true">✓</span>
+    <span class="th"><span data-photo="${it.photoId||''}">${c.g}</span></span>
+    <span class="body">
+      <b>${esc([it.brand,c.n,it.size,it.color].filter(Boolean).join(' '))}</b>
+      <span>${esc(m?m.name:'—')}${(it.qty||1)>1?'・'+(it.qty)+'枚':''}</span>
+    </span>
+  </button>`;
+}
+/* 譲るリストを、送れる形（一覧の文章と、番号つきの写真1枚）にする */
+function giveText(list){
+  const lines=list.map((it,n)=>{
+    const c=catOf(it.category);
+    const name=[c.n,it.size,it.color].filter(Boolean).join(' ');
+    return `${n+1}. ${name}${it.brand?'（'+it.brand+'）':''}${(it.qty||1)>1?' ×'+it.qty+'枚':''}`;
+  });
+  return `おさがりに出せる服があります（${list.length}着）\n\n${lines.join('\n')}\n\n欲しいものがあれば、番号で教えてください。`;
+}
+async function giveImage(list){
+  const cols=3, cell=360, pad=12, labH=58, head=96;
+  const shown=list.slice(0,30), rows=Math.ceil(shown.length/cols);
+  const W=cols*cell+(cols+1)*pad, H=head+rows*(cell+labH+pad)+pad;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const cx=cv.getContext('2d');
+  const font=w=>`${w} 30px -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif`;
+  cx.fillStyle='#F3F6F7'; cx.fillRect(0,0,W,H);
+  cx.fillStyle='#16323B'; cx.font=font('700').replace('30px','40px'); cx.textBaseline='middle';
+  cx.fillText(`おさがりに出せる服（${list.length}着）`,pad+8,head/2);
+  for(let k=0;k<shown.length;k++){
+    const it=shown[k], x=pad+(k%cols)*(cell+pad), y=head+Math.floor(k/cols)*(cell+labH+pad);
+    cx.fillStyle='#FFFFFF'; cx.fillRect(x,y,cell,cell+labH);
+    let drawn=false;
+    if(it.photoId){
+      try{
+        const p=await dbGet('photos',it.photoId);
+        if(p){ const bmp=await loadBitmap(p.blob); const w=bmp.width||bmp.naturalWidth, h=bmp.height||bmp.naturalHeight, sq=Math.min(w,h);
+          cx.drawImage(bmp,(w-sq)/2,(h-sq)/2,sq,sq,x,y,cell,cell); if(bmp.close) bmp.close(); drawn=true }
+      }catch(e){}
+    }
+    if(!drawn){ cx.fillStyle='#E6ECEE'; cx.fillRect(x,y,cell,cell); cx.fillStyle='#566A73'; cx.font=font('400').replace('30px','80px'); cx.textAlign='center'; cx.fillText(catOf(it.category).g,x+cell/2,y+cell/2); cx.textAlign='left' }
+    cx.fillStyle='#24557A'; cx.beginPath(); cx.arc(x+34,y+34,26,0,Math.PI*2); cx.fill();
+    cx.fillStyle='#FFFFFF'; cx.font=font('700'); cx.textAlign='center'; cx.fillText(String(k+1),x+34,y+35); cx.textAlign='left';
+    const c=catOf(it.category);
+    cx.fillStyle='#16323B'; cx.font=font('600');
+    let lab=[c.n,it.size].filter(Boolean).join(' ')+((it.qty||1)>1?' ×'+it.qty:'');
+    while(cx.measureText(lab).width>cell-20&&lab.length>2) lab=lab.slice(0,-2)+'…';
+    cx.fillText(lab,x+10,y+cell+labH/2);
+  }
+  return new Promise(r=>cv.toBlob(r,'image/jpeg',0.85));
+}
+async function openGiveSend(){
+  const list=S.items.filter(i=>i.status==='giving');
+  if(!list.length) return;
+  openSheet(`<div class="shead"><h3>まとめて送る</h3><button class="x" data-close>閉じる</button></div>
+    <p class="tiny muted">写真をつくっています…</p><div class="sp"></div>`);
+  const blob=await giveImage(list);
+  S._giveBlob=blob;
+  if(S._giveURL) URL.revokeObjectURL(S._giveURL);
+  S._giveURL=URL.createObjectURL(blob);
+  openSheet(`<div class="shead"><h3>まとめて送る</h3><button class="x" data-close>閉じる</button></div>
+    <div class="note ok">写真と文章を、LINEなどで親戚や友だちに送れます。番号は、写真と文章で同じです。</div>
+    <img class="give-prev" src="${S._giveURL}" alt="譲る服の写真一覧">
+    ${list.length>30?`<p class="tiny muted">写真には最初の30着だけ入ります。文章には全部入ります。</p>`:''}
+    <label class="f" for="give-txt">送る文章（書き換えられます）</label>
+    <textarea id="give-txt" rows="10">${esc(giveText(list))}</textarea>
+    <div class="act"><button class="btn" id="give-share">写真と文章を送る</button><button class="btn sub" id="give-copy">文章をコピー</button></div>
+    <p class="tiny muted">送り先の画面が出ないときは、写真を長押しして保存し、文章をコピーして送ってください。</p>
+    <div class="sp"></div>`);
 }
 function rowHTML(it){
   const m=memberOf(it.memberId), c=catOf(it.category);
@@ -2405,6 +2563,12 @@ async function openItem(id){
     </div>`:''}
 
   <h2 class="sec">手放す・管理</h2>
+  <div class="act">
+    ${it.status==='giving'
+      ? `<button class="btn" data-give="${it.id}|given">譲った</button><button class="btn ghost" data-give="${it.id}|active">譲るリストから外す</button>`
+      : it.status==='given' ? `<div class="note ok" style="width:100%">譲った服です。${it.givenAt?esc(fmtYM(it.givenAt))+'に譲りました。':''}</div><button class="btn ghost" data-give="${it.id}|active">手元に戻す</button>`
+      : `<button class="btn" data-give="${it.id}|giving">譲るリストに入れる</button>`}
+  </div>
   <div class="act">
     <button class="btn ghost" data-listing="${it.id}">出品文をつくる</button>
     ${it.status==='listed'
@@ -3065,20 +3229,13 @@ function diagTiles(list,label){
     <div class="ph" data-photo="${it.photoId||''}">${catOf(it.category).g}</div>
     <span class="tag">${esc(label?label(it):sizeLabel(it.size))}</span></button>`).join('')}</div>`;
 }
-function renderDiag(){
-  const {mid,n}=S.diag, m=memberOf(mid);
-  $('#add-streak').textContent='';
-  if(!m){ S.diag=null; return renderAdd() }
+function diagBody(m){
   const kid=isKidMember(m), g=growthInfo(m), r=diagnose(m);
-  let body;
-  if(!kid){
-    body=`<div class="note indigo">大人の服はサイズアウトの判定をしません。着た記録がたまると、長く着ていない服が「手放す」に出てきます。</div>`;
-  }else if(!g){
-    body=`<div class="note amber">身長が入っていないので診断できません。
-      <button class="linkish" data-member="${m.id}" style="display:block;margin-top:6px">${esc(m.name)}さんの身長を入れる</button></div>`;
-  }else{
-    const mo=it=>{ const v=monthsLeft(m,sizeNum(it.size)); return v!==null&&v>0?`あと${Math.max(1,Math.round(v))}か月`:sizeLabel(it.size) };
-    body=`<p class="tiny muted" style="margin:0 0 10px">${esc(m.name)}さん・${ageOf(m)??'?'}歳・今の身長 約${g.nowH.toFixed(0)}cm
+  if(!kid) return {r,html:`<div class="note indigo">大人の服はサイズアウトの判定をしません。着た記録がたまると、長く着ていない服が「手放す」に出てきます。</div>`};
+  if(!g) return {r,html:`<div class="note amber">身長が入っていないので診断できません。
+      <button class="linkish" data-member="${m.id}" style="display:block;margin-top:6px">${esc(m.name)}さんの身長を入れる</button></div>`};
+  const mo=it=>{ const v=monthsLeft(m,sizeNum(it.size)); return v!==null&&v>0?`あと${Math.max(1,Math.round(v))}か月`:sizeLabel(it.size) };
+  return {r,html:`<p class="tiny muted" style="margin:0 0 10px">${esc(m.name)}さん・${ageOf(m)??'?'}歳・今の身長 約${g.nowH.toFixed(0)}cm
       ${g.est?'（年齢の平均から推定。測って入れると正確になります）':''}</p>
       <div class="diagrow out"><b>🔴 もう小さい服</b><span class="num">${r.out.length}着</span></div>
       ${r.out.length?diagTiles(r.out):'<p class="tiny muted" style="margin:6px 2px 0">ありません。</p>'}
@@ -3090,15 +3247,25 @@ function renderDiag(){
       ${r.year.length?diagTiles(r.year,mo):'<p class="tiny muted" style="margin:6px 2px 0">ありません。</p>'}
       ${(()=>{ const ny=nextYear(m); return ny&&ny.size?`<div class="note indigo" style="margin-top:10px">🛍 <span class="nb">来年の今ごろは</span><span class="nb">約${ny.h.toFixed(0)}cm。</span><span class="nb">シーズンオフの</span><span class="nb">セールで</span><span class="nb">買っておくなら</span> <b class="nb">${ny.size}サイズ</b><span class="nb">が目安です。</span></div>`:'' })()}
       <div class="diagrow ok"><b>🟢 まだ着られる</b><span class="num">${r.ok.length}着</span></div>
-      ${r.nosize.length?`<p class="tiny muted" style="margin:10px 2px 0">サイズが入っていない服が${r.nosize.length}着あります（くつ・小物など）。</p>`:''}`;
-  }
+      ${r.nosize.length?`<p class="tiny muted" style="margin:10px 2px 0">サイズが入っていない服が${r.nosize.length}着あります（くつ・小物など）。</p>`:''}`};
+}
+function diagChips(m,attr){
+  const kids=S.members.filter(isKidMember);
+  return kids.length>1?`<div class="filters">${kids.map(x=>
+    `<button class="chip" ${attr}="${x.id}" aria-pressed="${x.id===m.id}"><span class="mdot" style="background:${memberHex(x)}"></span>${esc(x.name)}</button>`).join('')}</div>`:'';
+}
+/* 登録のあとに出す診断（登録タブの中） */
+function renderDiag(){
+  const {mid,n}=S.diag, m=memberOf(mid);
+  $('#add-streak').textContent='';
+  if(!m){ S.diag=null; return renderAdd() }
+  const kid=isKidMember(m), {r,html}=diagBody(m);
   $('#add-body').innerHTML=`
   <div class="card diagcard">
     ${n?`<div class="homehead"><b>🎉 ${n}着を登録しました</b></div>`:''}
     <h2 class="sec" style="margin-top:${n?4:0}px">診断結果</h2>
-    ${S.members.filter(isKidMember).length>1?`<div class="filters">${S.members.filter(isKidMember).map(x=>
-      `<button class="chip" data-diag="${x.id}" aria-pressed="${x.id===m.id}"><span class="mdot" style="background:${memberHex(x)}"></span>${esc(x.name)}</button>`).join('')}</div>`:''}
-    ${body}
+    ${diagChips(m,'data-diag')}
+    ${html}
   </div>
   <div class="act col">
     ${r.out.length&&kid?`<button class="btn wide" data-go="out" data-diagdone>もう小さい服を「手放す」で見る</button>`:''}
@@ -3107,6 +3274,21 @@ function renderDiag(){
   </div>
   <div class="sp"></div>`;
   hydratePhotos($('#add-body'));
+  if(!S.settings.diagSeen){ S.settings.diagSeen=true; saveSettings() }
+}
+/* ホームやクローゼットから開く診断（画面の上に重ねて出す） */
+function openDiagSheet(mid){
+  const m=memberOf(mid); if(!m) return;
+  const kid=isKidMember(m), {r,html}=diagBody(m);
+  openSheet(`<div class="shead"><h3>診断結果</h3><button class="x" data-close>閉じる</button></div>
+    <div class="diagcard">${diagChips(m,'data-diagsheet')}
+    ${html}</div>
+    <div class="act col">
+      ${r.out.length&&kid?`<button class="btn wide" data-go="out">もう小さい服を「手放す」で見る</button>`:''}
+      <button class="btn sub wide" data-famcloset="${m.id}">${esc(m.name)}さんの服をサイズ順で見る</button>
+    </div>
+    <div class="sp"></div>`);
+  hydratePhotos($('#sheet-inner'));
   if(!S.settings.diagSeen){ S.settings.diagSeen=true; saveSettings() }
 }
 
@@ -3238,7 +3420,7 @@ async function acceptPhoto(source){
   if(S.settings.aiMode==='auto' && S.draft?.blob) aiAnalyze();
 }
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wpick],[data-batch],[data-bmem],[data-bdel],[data-bretry],[data-bsize],[data-hest],[data-newmember],[data-intro],[data-guide],[data-backuplater],[data-backupnow],[data-aiconsent],[data-aiconsentreset],[data-introclose],[data-intronext],[data-introstart],[data-diag],[data-diagdone],[data-bdup],[data-bdupact],[data-dupreview],[data-dupmerge],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-step],[data-wearon],[data-fontscale],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#batch-cam,#batch-pick,#batch-save,#batch-cancel,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
+  const t=e.target.closest('[data-tab],[data-go],[data-fm],[data-fc],[data-tmem],[data-wpick],[data-batch],[data-bmem],[data-bdel],[data-bretry],[data-bsize],[data-hest],[data-newmember],[data-intro],[data-guide],[data-backuplater],[data-backupnow],[data-aiconsent],[data-aiconsentreset],[data-introclose],[data-intronext],[data-introstart],[data-diag],[data-diagdone],[data-diagsheet],[data-famcloset],[data-bdup],[data-bdupact],[data-dupreview],[data-dupmerge],[data-wear],[data-item],[data-member],[data-dmem],[data-dcat],[data-dsize],[data-dcolor],[data-dseason],[data-msize],[data-mcolor],[data-finish],[data-wday],[data-dbuy],[data-ebuy],[data-fcgo],[data-fsizeclear],[data-sizemore],[data-dup],[data-dupact],[data-qty],[data-emem],[data-ecat],[data-esize],[data-ecolor],[data-eseason],[data-close],[data-step],[data-wearon],[data-fontscale],[data-wear2],[data-unwear],[data-pick],[data-outfitsave],[data-outfitmode],[data-ocat],[data-oreg],[data-wphoto],[data-tcat],[data-plan],[data-limit],[data-handdown],[data-listing],[data-edit],[data-status],[data-give],[data-gsel],[data-gmode],[data-gall],#give-add,#give-send,#give-done-all,#give-share,#give-copy,[data-del],[data-savemember],[data-delmember],[data-delheight],[data-saveedit],#add-member,#exp-meta,#exp-full,#imp,#save-next,#save-done,#copy-listing,#shot-label,#shot-pick,#shot-redo,#cam-close,#cam-shoot,#cam-pick,#batch-cam,#batch-pick,#batch-save,#batch-cancel,#ai-run,#outfit-shot,#save-api,#add-pack,#use-outfit,#cancel-wearon,[data-aimode]');
   if(!t) return;
   const g=n=>t.getAttribute(n);
 
@@ -3263,8 +3445,13 @@ document.addEventListener('click',async e=>{
   if(t.hasAttribute('data-introstart')){ closeIntro(); go('today'); return S.members.length?null:openMemberForm(null) }
   if(t.hasAttribute('data-diagdone')) S.diag=null;
   if(g('data-diag')){ S.diag={mid:g('data-diag'),n:0}; return go('add') }
+  if(g('data-diagsheet')) return openDiagSheet(g('data-diagsheet'));
+  if(g('data-famcloset')){
+    closeSheet(); S.fMember=g('data-famcloset'); S.fCat='all'; S.fSize=null;
+    S.settings.closetSort='size'; saveSettings(); return go('closet');
+  }
   if(g('data-tab')){ S.diag=null; if(g('data-tab')==='closet') S.fSize=null; if(g('data-tab')==='today') S.wearDate=null; return go(g('data-tab')) }
-  if(g('data-go'))  return go(g('data-go'));
+  if(g('data-go'))  { if(t.closest('#sheet-inner')) closeSheet(); return go(g('data-go')) }
   if(t.hasAttribute('data-close')) return closeSheet();
 
   if(g('data-wday')){ const v=g('data-wday'); S.wearDate = v===today()?null:v; return renderToday() }
@@ -3581,6 +3768,54 @@ document.addEventListener('click',async e=>{
     it.memberId=to.id; it.handedDown=true;
     await dbPut('items',it); await reload(); closeSheet(); render();
     toast(to.name+'さんへ移しました');
+    return;
+  }
+  /* --- 譲るリスト --- */
+  if(g('data-gmode')){
+    S._giveSel = g('data-gmode')==='on' ? new Set() : null; return renderOut();
+  }
+  if(g('data-gsel')){
+    const id=g('data-gsel'); S._giveSel.has(id)?S._giveSel.delete(id):S._giveSel.add(id); return renderOut();
+  }
+  if(g('data-gall')){
+    const arr=(g('data-gall')==='out'?S.items.filter(isOutgrown):S.items.filter(isStale)).map(i=>i.id);
+    const all=arr.every(id=>S._giveSel.has(id));
+    arr.forEach(id=>all?S._giveSel.delete(id):S._giveSel.add(id)); return renderOut();
+  }
+  if(t.id==='give-add'){
+    const ids=[...(S._giveSel||[])]; if(!ids.length) return;
+    for(const id of ids){ const it=S.items.find(i=>i.id===id); if(it){ it.status='giving'; await dbPut('items',it) } }
+    S._giveSel=null; await reload(); render(); toast(ids.length+'着を譲るリストに入れました'); return;
+  }
+  if(g('data-give')){
+    const [id,st]=g('data-give').split('|');
+    const it=S.items.find(i=>i.id===id); if(!it) return;
+    it.status=st; if(st==='given') it.givenAt=today(); else delete it.givenAt;
+    await dbPut('items',it); await reload(); closeSheet(); render();
+    toast(st==='giving'?'譲るリストに入れました':st==='given'?'譲ったにしました':'戻しました');
+    return;
+  }
+  if(t.id==='give-send') return openGiveSend();
+  if(t.id==='give-done-all'){
+    const list=S.items.filter(i=>i.status==='giving'); if(!list.length) return;
+    if(!confirm(list.length+'着をすべて「譲った」にします。よろしいですか？')) return;
+    for(const it of list){ it.status='given'; it.givenAt=today(); await dbPut('items',it) }
+    await reload(); render(); toast(list.length+'着を譲ったにしました'); return;
+  }
+  if(t.id==='give-copy'){
+    const ta=$('#give-txt');
+    try{ await navigator.clipboard.writeText(ta.value); toast('コピーしました') }
+    catch(err){ ta.select(); document.execCommand('copy'); toast('コピーしました') }
+    return;
+  }
+  if(t.id==='give-share'){
+    const text=$('#give-txt').value;
+    const file=S._giveBlob?new File([S._giveBlob],'osagari.jpg',{type:'image/jpeg'}):null;
+    try{
+      if(file&&navigator.canShare&&navigator.canShare({files:[file]})) await navigator.share({files:[file],text});
+      else if(navigator.share) await navigator.share({text});
+      else { await navigator.clipboard.writeText(text); toast('文章をコピーしました。写真は長押しで保存できます') }
+    }catch(err){ if(err&&err.name!=='AbortError') toast('送れませんでした。写真を長押しで保存し、文章をコピーしてください') }
     return;
   }
   if(g('data-status')){
